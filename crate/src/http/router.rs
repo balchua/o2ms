@@ -29,7 +29,7 @@ pub fn build_router(config: &AppConfig, state: WrapperState) -> Router {
             "/.well-known/jwks.json",
             get(oauth::jwks_doc),
         )
-        .route("/authorize", get(oauth::authorize_flow))
+        .route("/authorize", get(oauth::authorize_flow).post(oauth::authorize_submit))
         .route("/token", post(oauth::token_endpoint))
         .route("/device/code", post(oauth::device_code_proxy))
         .route("/device/token", post(oauth::device_token_proxy))

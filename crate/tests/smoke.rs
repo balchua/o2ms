@@ -436,6 +436,116 @@ async fn configured_user_becomes_default_authorization_flow_subject(
     Ok(())
 }
 
+#[tokio::test]
+async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = AppConfig::default();
+    config.server.bind_port = 0;
+    config.oauth.require_state = false;
+    config.oauth.authorization_user_picker_enabled = true;
+    config.clients = vec![oauth2_mock_server::ClientConfig {
+        client_id: "picker-client".to_string(),
+        client_name: "Picker Client".to_string(),
+        redirect_uris: vec!["http://localhost:8080/callback".to_string()],
+        grant_types: vec!["authorization_code".to_string()],
+        response_types: vec!["code".to_string()],
+        allowed_scopes: vec!["openid".to_string()],
+        default_scopes: vec!["openid".to_string()],
+        linked_users: vec!["demo-user".to_string()],
+        ..oauth2_mock_server::ClientConfig::default()
+    }];
+    config.users = vec![
+        oauth2_mock_server::UserConfig {
+            user_id: "demo-user".to_string(),
+            sub: "demo-subject".to_string(),
+            username: "demo".to_string(),
+            email: "demo@example.com".to_string(),
+            display_name: "Demo User".to_string(),
+            ..oauth2_mock_server::UserConfig::default()
+        },
+        oauth2_mock_server::UserConfig {
+            user_id: "support-user".to_string(),
+            sub: "support-subject".to_string(),
+            username: "support".to_string(),
+            email: "support@example.com".to_string(),
+            display_name: "Support User".to_string(),
+            ..oauth2_mock_server::UserConfig::default()
+        },
+    ];
+
+    let server = spawn(config).await?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+
+    let authorize = client
+        .get(format!("{}/authorize", server.base_url()))
+        .query(&[
+            ("response_type", "code"),
+            ("client_id", "picker-client"),
+            ("redirect_uri", "http://localhost:8080/callback"),
+            ("scope", "openid"),
+        ])
+        .send()
+        .await?;
+
+    assert_eq!(authorize.status(), reqwest::StatusCode::OK);
+    let picker_html = authorize.text().await?;
+    assert!(picker_html.contains("Select a test user"));
+    assert!(picker_html.contains(r#"value="demo-user""#));
+    assert!(!picker_html.contains(r#"value="support-user""#));
+
+    let authorize_submit = client
+        .post(format!("{}/authorize", server.base_url()))
+        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body(
+            "response_type=code&client_id=picker-client&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback&scope=openid&selected_user_id=demo-user",
+        )
+        .send()
+        .await?;
+
+    assert!(authorize_submit.status().is_redirection());
+    let location = authorize_submit
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .ok_or("authorize redirect location missing")?;
+    let code = location
+        .split('?')
+        .nth(1)
+        .and_then(|query| query.split('&').find(|part| part.starts_with("code=")))
+        .and_then(|part| part.split('=').nth(1))
+        .ok_or("authorization code missing from redirect")?;
+
+    let token = client
+        .post(format!("{}/token", server.base_url()))
+        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body(format!(
+            "grant_type=authorization_code&client_id=picker-client&code={code}"
+        ))
+        .send()
+        .await?;
+
+    assert!(token.status().is_success());
+    let token_json: serde_json::Value = token.json().await?;
+    let access_token = token_json["access_token"]
+        .as_str()
+        .ok_or("access token missing")?;
+
+    let userinfo = client
+        .get(format!("{}/userinfo", server.base_url()))
+        .bearer_auth(access_token)
+        .send()
+        .await?;
+
+    assert!(userinfo.status().is_success());
+    let userinfo_json: serde_json::Value = userinfo.json().await?;
+    assert_eq!(userinfo_json["sub"].as_str(), Some("demo-subject"));
+
+    server.shutdown().await;
+    Ok(())
+}
+
 fn decode_jwt_payload(token: &str) -> Result<Value, Box<dyn std::error::Error>> {
     use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 

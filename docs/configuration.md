@@ -153,6 +153,7 @@ Controls OAuth/OIDC behavior exposed through the upstream engine.
 ```yaml
 oauth:
   require_state: true
+  authorization_user_picker_enabled: false
   pkce_required: false
   access_token_ttl_seconds: 3600
   refresh_token_ttl_seconds: 2592000
@@ -188,6 +189,7 @@ oauth:
 Fields:
 
 - `require_state`: whether authorization requests require `state`
+- `authorization_user_picker_enabled`: whether `/authorize` should show a local user picker page for authorization-code flows
 - `pkce_required`: reserved for later enforcement logic
 - `access_token_ttl_seconds`: access token lifetime
 - `refresh_token_ttl_seconds`: refresh token lifetime

@@ -164,7 +164,8 @@ Handled by the embedded upstream server. This repository currently relies on the
 Important current behavior:
 
 - consent is auto-granted for test purposes
-- the mock uses the **first enabled configured user** as the default authorization-flow identity
+- when `oauth.authorization_user_picker_enabled` is `true`, the mock shows a simple local picker page so the tester can choose an enabled YAML user before code issuance
+- when the picker is disabled, the mock uses the **first enabled configured user** as the default authorization-flow identity
 - if no enabled configured user exists, it falls back to the upstream built-in default user
 
 ## Token endpoint

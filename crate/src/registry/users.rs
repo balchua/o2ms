@@ -48,10 +48,19 @@ pub fn find_enabled_user_by_sub<'a>(config: &'a AppConfig, subject: &str) -> Opt
         .find(|user| user.enabled && user.sub == subject)
 }
 
+#[must_use]
+pub fn find_enabled_user_by_user_id<'a>(config: &'a AppConfig, user_id: &str) -> Option<&'a UserConfig> {
+    config
+        .users
+        .iter()
+        .find(|user| user.enabled && user.user_id == user_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        default_user, effective_default_user_id, enabled_users, linked_enabled_users, UserRegistry,
+        default_user, effective_default_user_id, enabled_users, find_enabled_user_by_user_id,
+        linked_enabled_users, UserRegistry,
     };
     use crate::config::model::{AppConfig, UserConfig};
 
@@ -116,5 +125,23 @@ mod tests {
         let linked = linked_enabled_users(&config, &[String::from("alice"), String::from("bob")]);
         assert_eq!(linked.len(), 1);
         assert_eq!(linked[0].user_id, "alice");
+    }
+
+    #[test]
+    fn finds_enabled_user_by_user_id() {
+        let config = AppConfig {
+            users: vec![UserConfig {
+                user_id: "alice".to_string(),
+                sub: "alice-sub".to_string(),
+                enabled: true,
+                ..UserConfig::default()
+            }],
+            ..AppConfig::default()
+        };
+
+        assert_eq!(
+            find_enabled_user_by_user_id(&config, "alice").map(|user| user.sub.as_str()),
+            Some("alice-sub")
+        );
     }
 }

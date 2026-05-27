@@ -99,7 +99,7 @@ MOCK_ISSUER_URI=http://127.0.0.1:8090 \
   mvn -f examples/springboot-v4-resource-server/pom.xml spring-boot:run
 ```
 
-It listens on `http://127.0.0.1:8081`, and the fuller setup flow is documented in [docs/springboot.md](docs/springboot.md).
+It listens on `http://127.0.0.1:8081`. For the browser flow, open `http://127.0.0.1:8081/login/me` and Spring Boot will redirect to the mock server picker before returning to the protected page. The fuller setup flow is documented in [docs/springboot.md](docs/springboot.md).
 
 ## Config examples
 

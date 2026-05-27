@@ -11,12 +11,15 @@ issuer:
 
 oauth:
   require_state: true
+  authorization_user_picker_enabled: true
   pkce_required: false
   access_token_ttl_seconds: 3600
   refresh_token_ttl_seconds: 2592000
   authorization_code_ttl_seconds: 600
   cleanup_interval_seconds: 300
   supported_grant_types:
+    - authorization_code
+    - refresh_token
     - client_credentials
   supported_response_types:
     - code
@@ -29,6 +32,7 @@ oauth:
     - name
     - email
   token_endpoint_auth_methods:
+    - client_secret_basic
     - none
   code_challenge_methods:
     - plain
@@ -39,9 +43,9 @@ oauth:
 token_response:
   emit_json_body: true
   emit_headers:
-    - header_name: Authorization
+    - header_name: X-JWT-Assertion
       token_field: access_token
-      value_format: bearer
+      value_format: raw
 
 clients:
   - client_id: springboot-resource-server
@@ -65,6 +69,31 @@ clients:
     claims_template_refs:
       - spring-default
     custom_claims: {}
+  - client_id: springboot-web-client
+    client_name: Spring Boot Web Client
+    enabled: true
+    client_secret: springboot-secret
+    token_endpoint_auth_method: client_secret_basic
+    redirect_uris:
+      - http://127.0.0.1:8081/login/oauth2/code/mock
+    grant_types:
+      - authorization_code
+      - refresh_token
+    response_types:
+      - code
+    allowed_scopes:
+      - openid
+      - profile
+      - email
+    default_scopes:
+      - openid
+      - profile
+      - email
+    linked_users:
+      - demo-user
+    claims_template_refs:
+      - spring-default
+    custom_claims: {}
 
 users:
   - user_id: demo-user
@@ -78,6 +107,21 @@ users:
       - profile
     roles:
       - USER
+    groups: []
+    claims_template_refs:
+      - spring-default
+    custom_claims: {}
+  - user_id: support-user
+    sub: support-user
+    username: support-user
+    email: support@example.com
+    display_name: Support User
+    enabled: true
+    default_scopes:
+      - openid
+      - profile
+    roles:
+      - SUPPORT
     groups: []
     claims_template_refs:
       - spring-default

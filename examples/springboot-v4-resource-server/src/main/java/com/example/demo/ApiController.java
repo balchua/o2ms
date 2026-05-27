@@ -20,4 +20,13 @@ public class ApiController {
         response.put("authorizations", jwt.getClaim("authorizations"));
         return response;
     }
+
+    @GetMapping("/api/ping")
+    public Map<String, Object> ping(@AuthenticationPrincipal Jwt jwt) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "ok");
+        response.put("subject", jwt.getSubject());
+        response.put("message", "Bearer token accepted by Spring Security resource server");
+        return response;
+    }
 }

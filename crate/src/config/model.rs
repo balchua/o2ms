@@ -69,6 +69,7 @@ impl Default for IssuerConfig {
 #[serde(default)]
 pub struct OauthConfig {
     pub require_state: bool,
+    pub authorization_user_picker_enabled: bool,
     pub pkce_required: bool,
     pub access_token_ttl_seconds: u64,
     pub refresh_token_ttl_seconds: u64,
@@ -88,6 +89,7 @@ impl Default for OauthConfig {
     fn default() -> Self {
         Self {
             require_state: true,
+            authorization_user_picker_enabled: false,
             pkce_required: false,
             access_token_ttl_seconds: 3600,
             refresh_token_ttl_seconds: 2_592_000,
@@ -272,6 +274,7 @@ mod tests {
         assert_eq!(config.issuer.base_url, "http://127.0.0.1:8090");
         assert!(config.token_response.emit_json_body);
         assert_eq!(config.oauth.signing_algorithm, "RS256");
+        assert!(!config.oauth.authorization_user_picker_enabled);
     }
 
     #[test]
