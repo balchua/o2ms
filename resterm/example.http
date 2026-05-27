@@ -1,0 +1,42 @@
+# @use ./rts/helpers.rts
+
+### Example end-to-end flow for the running Spring Boot sample
+### Assumes:
+### 1. the mock server is running on {{base.url}}
+### 2. the Spring Boot sample is running on http://127.0.0.1:8081
+### 3. the mock server was started with configs/mock-server.springboot.yaml
+
+### Mock server health
+# @name MockHealth
+GET {{base.url}}/health
+
+### OIDC discovery
+# @name Discovery
+GET {{base.url}}/.well-known/openid-configuration
+
+### Get a client_credentials access token for the preloaded Spring Boot sample client
+# @name Token
+POST {{base.url}}/token
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+grant_type=client_credentials&client_id=springboot-resource-server&scope=openid%20profile%20email
+
+### Call the Spring Boot sample API with the token from the JSON response
+### Replace REPLACE_WITH_ACCESS_TOKEN with the access_token returned by Token
+# @name SpringApiWithJsonToken
+GET http://127.0.0.1:8081/api/me
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtleS0xMTNiOWZkZC1hODgyLTRlNjAtODAzZi1kZGQ3OGUwN2M3NTQifQ.eyJhdWQiOiJzcHJpbmdib290LXJlc291cmNlLXNlcnZlciIsImF1dGhfdGltZSI6MTc3OTg2MDM4MCwiYXV0aG9yaXphdGlvbnMiOltdLCJhenAiOiJzcHJpbmdib290LXJlc291cmNlLXNlcnZlciIsImV4cCI6MTc3OTg2Mzk4MCwiaWF0IjoxNzc5ODYwMzgwLCJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjgwOTAiLCJqdGkiOiI0ZTJjNTY4Zi01ZGE1LTQyM2MtYTBhNS0wODc1MzY3OGJmYTgiLCJuYW1lIjoiRGVtbyBVc2VyIiwic2NvcGUiOiJlbWFpbCBvcGVuaWQgcHJvZmlsZSIsInNpZCI6InNpZC03ZWZlMzA4My01YjFmLTQxODUtOWJjYS0xNWEzNTEzMDY1NjgiLCJzdWIiOiJjbGllbnQiLCJ0eXAiOiJCZWFyZXIifQ.CD5h0sSEB9H2eAwslsFDsnYCPLw7hLIDdKFaLI5JpFZJFGyv024Z8aQakL-FnwSVtgd6rlF_4TGTtkHNR9-qTuU-OvGlsSRJaC-lWpAU_qtr-_uMAfH0d3C6ZiKnyKsDRoRYKmDwIU9vqoFgT1Pk153kbsYi6Zj0NIdj1pQscFRZyTWRHFBPt3B-o4vqlno1wTo7fv4KkptmwulR0y1tlbzwUJ96K_zUX0uUp6B6iObo5XbVCpsyFUN5pgkdJyIOzg69pPvMGf6gCBmgEjDkED56OYEUpYpu98-RiyU612jNtJ-HKy-G5stcFNRI0V0F4ONBgATZZf37zBmyGkaLmA
+
+
+### Call the Spring Boot sample API with the Authorization header returned by /token
+### Replace REPLACE_WITH_BEARER_HEADER with the full header value from Token, e.g. "Bearer eyJ..."
+# @name SpringApiWithHeaderToken
+GET http://127.0.0.1:8081/api/me
+Authorization: REPLACE_WITH_BEARER_HEADER
+
+### Optional: inspect the issued token against the mock server
+### Replace REPLACE_WITH_ACCESS_TOKEN with the access_token returned by Token
+# @name UserInfo
+GET {{base.url}}/userinfo
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN

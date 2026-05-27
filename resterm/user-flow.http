@@ -1,0 +1,53 @@
+# @use ./rts/helpers.rts
+
+### User-style flow notes
+### 1. The mock server uses the first enabled entry in users: as the simulated logged-in user.
+### 2. This file registers a temporary authorization_code client so it works even if you do not know the active YAML config.
+### 3. Copy the returned client_id from RegisterUserClient into the authorize request.
+### 4. Copy the code from the redirect Location header into ExchangeUserCode.
+
+### Health check
+# @name Health
+GET {{base.url}}/health
+
+### Register a temporary authorization_code client
+# @name RegisterUserClient
+POST {{base.url}}/register
+Content-Type: application/json
+Accept: application/json
+
+{
+  "client_name": "Resterm User Flow Client",
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "openid profile email",
+  "redirect_uris": ["http://localhost:8080/callback"]
+}
+
+### Start the simulated user authorization flow
+### Replace REPLACE_WITH_CLIENT_ID with the client_id returned by RegisterUserClient
+### Copy the code from the 302 Location header
+# @name AuthorizeUser
+GET {{base.url}}/authorize?response_type=code&client_id=REPLACE_WITH_CLIENT_ID&redirect_uri=http://localhost:8080/callback&scope=openid%20profile%20email&state=resterm-user-flow
+
+### Exchange the authorization code for tokens
+### Replace REPLACE_WITH_CLIENT_ID and REPLACE_WITH_CODE
+# @name ExchangeUserCode
+POST {{base.url}}/token
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+grant_type=authorization_code&client_id=REPLACE_WITH_CLIENT_ID&code=REPLACE_WITH_CODE
+
+### Call the Spring Boot API with the user token
+### Replace REPLACE_WITH_ACCESS_TOKEN with the access_token from ExchangeUserCode
+# @name CallSpringApi
+GET http://127.0.0.1:8081/api/me
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+
+### Optional: inspect the issued user token directly against the mock server
+### Replace REPLACE_WITH_ACCESS_TOKEN with the access_token from ExchangeUserCode
+# @name UserInfo
+GET {{base.url}}/userinfo
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN

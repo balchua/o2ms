@@ -1,0 +1,43 @@
+# @use ./rts/helpers.rts
+
+### Health check
+# @name Health
+GET {{base.url}}/health
+
+### Discovery
+# @name Discovery
+GET {{base.url}}/.well-known/openid-configuration
+
+### Get access token for the preloaded Spring Boot example client
+### This only works when the server was started with configs/mock-server.springboot.yaml
+# @name SpringBootToken
+POST {{base.url}}/token
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+grant_type=client_credentials&client_id=springboot-resource-server&scope=openid%20profile%20email
+
+### Register a temporary client at runtime
+### Use this when you do not know which YAML config the server was started with
+# @name RegisterClient
+POST {{base.url}}/register
+Content-Type: application/json
+Accept: application/json
+
+{
+  "client_name": "Resterm Temp Client",
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["client_credentials"],
+  "response_types": ["code"],
+  "scope": "openid profile email",
+  "redirect_uris": []
+}
+
+### Get access token for a runtime-registered client
+### Replace REPLACE_WITH_CLIENT_ID with the client_id returned by RegisterClient
+# @name RuntimeToken
+POST {{base.url}}/token
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+grant_type=client_credentials&client_id=REPLACE_WITH_CLIENT_ID&scope=openid%20profile%20email
