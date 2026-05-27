@@ -1,9 +1,0 @@
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${MOCK_ISSUER_URI:http://127.0.0.1:8090}
-
-server:
-  port: 8081
