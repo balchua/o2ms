@@ -43,6 +43,7 @@ This can be changed through YAML or environment variables.
 | POST | `/revoke` | upstream | no | Token revocation |
 | GET | `/userinfo` | upstream | no | UserInfo endpoint |
 | GET | `/error` | upstream | no | Simple error page |
+| Any | `<gateway route path_prefix>/*` | wrapper | yes | Path-prefix reverse proxy with local token validation |
 | GET | `/admin/clients` | wrapper | yes | List current preloaded and runtime clients |
 | POST | `/admin/reset` | wrapper | yes | Clear runtime state and reseed configured clients |
 | GET | `/admin/config` | wrapper | yes | Inspect the active loaded config |
@@ -63,6 +64,24 @@ Status:
 
 - `200 OK` when enabled
 - `404 Not Found` when `server.health_endpoint_enabled` is `false`
+
+## Gateway proxy routes
+
+When `gateway.enabled=true` and `gateway.mode=oauth_and_gateway`, configured `gateway.routes[].path_prefix` values are mounted as proxy routes.
+
+Behavior:
+
+- path-prefix routing only (v1)
+- validates inbound bearer token with local OAuth state before upstream call
+- returns `401` immediately for missing/invalid token on `auth_required` routes
+- forwards token to upstream using configured outbound header/value format
+- applies global timeout and body-size limits from `gateway.timeout_ms` and `gateway.max_body_bytes`
+
+Common error responses:
+
+- `401` with `{"error":"missing_bearer_token"}` or `{"error":"invalid_bearer_token"}`
+- `504` with `{"error":"upstream_timeout"}`
+- `502` with `{"error":"upstream_unavailable"}` or `{"error":"upstream_response_too_large"}`
 
 ## OIDC discovery endpoints
 

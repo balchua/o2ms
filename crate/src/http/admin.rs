@@ -155,7 +155,7 @@ mod tests {
 
         let upstream = build_upstream_state(&config, 8090);
         seed_clients(&config, &upstream).await?;
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .method(Method::GET)
             .uri("/admin/clients")

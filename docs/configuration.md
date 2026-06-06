@@ -29,6 +29,9 @@ O2MS_SERVER__RUNTIME_CLIENT_REGISTRATION_ENABLED=false
 O2MS_ISSUER__BASE_URL=http://127.0.0.1:9191
 O2MS_OAUTH__REQUIRE_STATE=false
 O2MS_OAUTH__ACCESS_TOKEN_TTL_SECONDS=120
+O2MS_GATEWAY__ENABLED=true
+O2MS_GATEWAY__MODE=oauth_and_gateway
+O2MS_GATEWAY__TIMEOUT_MS=1500
 ```
 
 Rules:
@@ -91,6 +94,7 @@ Use `configs/mock-server.yaml` as the main project config and keep environment-s
 server:
 issuer:
 oauth:
+gateway:
 token_response:
 clients:
 users:
@@ -210,6 +214,54 @@ Validation:
 - `signing_algorithm` currently only supports `RS256`
 - `signing_key_strategy` currently only supports `ephemeral_rsa`
 - `token_endpoint_auth_methods` and `code_challenge_methods` must use supported values
+
+### `gateway`
+
+Controls optional path-prefix API gateway behavior.
+
+```yaml
+gateway:
+  enabled: false
+  mode: oauth_only
+  timeout_ms: 2000
+  max_body_bytes: 1048576
+  auth:
+    validate_with_local_oauth: true
+    outbound_header_name: Authorization
+    outbound_value_format: bearer
+  routes: []
+```
+
+Supported modes:
+
+- `oauth_only` (default): OAuth endpoints only, no proxy routes
+- `oauth_and_gateway`: OAuth endpoints plus proxy routes
+
+Fields:
+
+- `enabled`: enables gateway route proxying
+- `mode`: `oauth_only` or `oauth_and_gateway`
+- `timeout_ms`: upstream timeout in milliseconds
+- `max_body_bytes`: global request/response body cap for gateway traffic
+- `auth.validate_with_local_oauth`: must be `true` in v1
+- `auth.outbound_header_name`: default outbound token header
+- `auth.outbound_value_format`: `bearer` or `raw`
+- `routes`: list of path-prefix routes
+  - `id`: unique route name
+  - `enabled`: route switch
+  - `path_prefix`: inbound prefix to match
+  - `upstream_base_url`: absolute upstream URL
+  - `auth_required`: require valid local bearer token before proxying
+  - `outbound_header_name`: optional per-route header override
+  - `outbound_value_format`: optional per-route `bearer`/`raw` override
+
+Validation:
+
+- `gateway.enabled=true` requires `gateway.mode=oauth_and_gateway`
+- `timeout_ms` and `max_body_bytes` must be greater than zero
+- route ids must be unique
+- route prefixes must start with `/` and cannot be `/`
+- route prefixes must not collide with reserved OAuth/system endpoints (`/token`, `/authorize`, `/register`, `/admin`, `/.well-known`, `/userinfo`, `/introspect`, `/revoke`, `/device`, `/error`, `/health`)
 
 ### `token_response`
 

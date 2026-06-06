@@ -1,9 +1,14 @@
 use axum::{
+    extract::DefaultBodyLimit,
     http::{self, header, HeaderValue},
-    routing::{get, post},
+    routing::{any, get, post},
     Router,
 };
-use crate::{app::state::WrapperState, config::model::AppConfig};
+use crate::{
+    app::state::WrapperState,
+    config::model::{AppConfig, GatewayMode},
+    gateway,
+};
 use tower_http::{
     cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
@@ -54,6 +59,13 @@ pub fn build_router(config: &AppConfig, state: WrapperState) -> Router {
                 "/register/{client_id}",
                 get(oauth::get_client_proxy),
             );
+    }
+
+    if config.gateway.enabled && config.gateway.mode == GatewayMode::OauthAndGateway {
+        router = router
+            .route("/", any(gateway::proxy_request))
+            .route("/*path", any(gateway::proxy_request))
+            .layer(DefaultBodyLimit::max(config.gateway.max_body_bytes));
     }
 
     router.with_state(state)
@@ -112,7 +124,7 @@ mod tests {
         let upstream = build_upstream_state(&AppConfig::default(), 8090);
         let app = build_router(
             &AppConfig::default(),
-            WrapperState::new(AppConfig::default(), upstream),
+            WrapperState::new(AppConfig::default(), upstream)?,
         );
         let request = Request::builder()
             .uri("/health")
@@ -129,7 +141,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.server.health_endpoint_enabled = false;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .uri("/health")
             .body(Body::empty())?;
@@ -145,7 +157,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.server.runtime_client_registration_enabled = false;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .method(http::Method::POST)
             .uri("/register")
@@ -163,7 +175,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.admin.list_clients_endpoint_enabled = true;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .uri("/admin/clients")
             .body(Body::empty())?;
@@ -181,7 +193,7 @@ mod tests {
         config.server.bind_host = "0.0.0.0".to_string();
         config.admin.list_clients_endpoint_enabled = true;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .uri("/admin/clients")
             .body(Body::empty())?;

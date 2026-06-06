@@ -233,4 +233,23 @@ issuer:
         fs::remove_file(path)?;
         Ok(())
     }
+
+    #[test]
+    fn layered_overrides_apply_to_gateway_settings() -> Result<(), Box<dyn std::error::Error>> {
+        let builder = RawConfig::builder()
+            .set_override("gateway.enabled", true)?
+            .set_override("gateway.mode", "oauth_and_gateway")?
+            .set_override("gateway.timeout_ms", 1500_u64)?
+            .set_override("gateway.routes", vec![serde_json::json!({
+                "id": "users",
+                "path_prefix": "/proxy/users",
+                "upstream_base_url": "http://127.0.0.1:9001",
+            })])?;
+
+        let config = load_from_builder(builder)?;
+        assert!(config.gateway.enabled);
+        assert_eq!(config.gateway.timeout_ms, 1500);
+        assert_eq!(config.gateway.routes[0].id, "users");
+        Ok(())
+    }
 }

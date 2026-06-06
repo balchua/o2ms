@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::{
     claims::protect::PROTECTED_CLAIMS,
-    config::model::{AppConfig, ClientConfig, UserConfig},
+    config::model::{AppConfig, ClientConfig, GatewayMode, UserConfig},
     error::AppError,
 };
 
@@ -43,10 +43,122 @@ pub fn validate(config: &AppConfig) -> Result<(), AppError> {
 
     validate_ttls(config)?;
     validate_oauth_capabilities(config)?;
+    validate_gateway(config)?;
     validate_token_headers(config)?;
     validate_clients(config)?;
     validate_users(config)?;
     validate_claim_templates(config)?;
+
+    Ok(())
+}
+
+fn validate_gateway(config: &AppConfig) -> Result<(), AppError> {
+    if config.gateway.enabled && config.gateway.mode != GatewayMode::OauthAndGateway {
+        return Err(AppError::InvalidConfig(
+            "gateway.enabled=true requires gateway.mode=oauth_and_gateway".to_string(),
+        ));
+    }
+
+    if config.gateway.timeout_ms == 0 {
+        return Err(AppError::InvalidConfig(
+            "gateway.timeout_ms must be greater than zero".to_string(),
+        ));
+    }
+
+    if config.gateway.max_body_bytes == 0 {
+        return Err(AppError::InvalidConfig(
+            "gateway.max_body_bytes must be greater than zero".to_string(),
+        ));
+    }
+
+    if !config.gateway.auth.validate_with_local_oauth {
+        return Err(AppError::InvalidConfig(
+            "gateway.auth.validate_with_local_oauth must be true in v1".to_string(),
+        ));
+    }
+
+    HeaderName::from_bytes(config.gateway.auth.outbound_header_name.as_bytes()).map_err(|error| {
+        AppError::InvalidConfig(format!(
+            "gateway.auth.outbound_header_name '{}' is invalid: {error}",
+            config.gateway.auth.outbound_header_name
+        ))
+    })?;
+
+    let mut route_ids = HashSet::new();
+    for route in &config.gateway.routes {
+        if route.id.trim().is_empty() {
+            return Err(AppError::InvalidConfig(
+                "gateway.routes[].id must not be empty".to_string(),
+            ));
+        }
+        if !route_ids.insert(route.id.as_str()) {
+            return Err(AppError::InvalidConfig(format!(
+                "duplicate gateway route id '{}'",
+                route.id
+            )));
+        }
+        if route.path_prefix.trim().is_empty() || !route.path_prefix.starts_with('/') {
+            return Err(AppError::InvalidConfig(format!(
+                "gateway route '{}' path_prefix must start with '/'",
+                route.id
+            )));
+        }
+        if route.path_prefix == "/" {
+            return Err(AppError::InvalidConfig(format!(
+                "gateway route '{}' path_prefix '/' is not allowed",
+                route.id
+            )));
+        }
+        validate_route_path_reserved(route.id.as_str(), route.path_prefix.as_str())?;
+
+        let parsed_url = Url::parse(&route.upstream_base_url).map_err(|error| {
+            AppError::InvalidConfig(format!(
+                "gateway route '{}' upstream_base_url must be a valid URL: {error}",
+                route.id
+            ))
+        })?;
+        if parsed_url.host_str().is_none() {
+            return Err(AppError::InvalidConfig(format!(
+                "gateway route '{}' upstream_base_url must include a host",
+                route.id
+            )));
+        }
+
+        if let Some(header_name) = &route.outbound_header_name {
+            HeaderName::from_bytes(header_name.as_bytes()).map_err(|error| {
+                AppError::InvalidConfig(format!(
+                    "gateway route '{}' outbound_header_name '{}' is invalid: {error}",
+                    route.id, header_name
+                ))
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_route_path_reserved(route_id: &str, prefix: &str) -> Result<(), AppError> {
+    const RESERVED_PREFIXES: &[&str] = &[
+        "/health",
+        "/token",
+        "/authorize",
+        "/register",
+        "/admin",
+        "/.well-known",
+        "/userinfo",
+        "/introspect",
+        "/revoke",
+        "/device",
+        "/error",
+    ];
+
+    for reserved in RESERVED_PREFIXES {
+        if prefix == *reserved || prefix.starts_with(&format!("{reserved}/")) {
+            return Err(AppError::InvalidConfig(format!(
+                "gateway route '{route_id}' path_prefix '{prefix}' collides with reserved path '{reserved}'"
+            )));
+        }
+    }
 
     Ok(())
 }
@@ -468,6 +580,71 @@ clients:
     default_scopes:
       - openid
 ",
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_gateway_enabled_with_oauth_only_mode() {
+        let result = load_from_yaml(
+            r"
+gateway:
+  enabled: true
+  mode: oauth_only
+",
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_gateway_reserved_prefix() {
+        let result = load_from_yaml(
+            r"
+gateway:
+  enabled: true
+  mode: oauth_and_gateway
+  routes:
+    - id: bad
+      path_prefix: /token
+      upstream_base_url: http://127.0.0.1:9001
+",
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_gateway_duplicate_route_ids() {
+        let result = load_from_yaml(
+            r"
+gateway:
+  enabled: true
+  mode: oauth_and_gateway
+  routes:
+    - id: users
+      path_prefix: /proxy/users
+      upstream_base_url: http://127.0.0.1:9001
+    - id: users
+      path_prefix: /proxy/accounts
+      upstream_base_url: http://127.0.0.1:9002
+",
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_gateway_invalid_header_name() {
+        let result = load_from_yaml(
+            r#"
+gateway:
+  enabled: true
+  mode: oauth_and_gateway
+  auth:
+    outbound_header_name: "bad header"
+"#,
         );
 
         assert!(result.is_err());

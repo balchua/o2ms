@@ -75,7 +75,7 @@ pub async fn spawn(config: AppConfig) -> Result<RunningServer, AppError> {
     let upstream_state = build_upstream_state(&config, addr.port());
     let seeded_clients = seed_clients(&config, &upstream_state).await?;
     tracing::info!(seeded_clients, "preloaded configured clients into oauth store");
-    let wrapper_state = WrapperState::new(config.clone(), upstream_state);
+    let wrapper_state = WrapperState::new(config.clone(), upstream_state)?;
     let router = build_router(&config, wrapper_state);
 
     let handle = tokio::spawn(async move {
@@ -104,6 +104,9 @@ pub async fn run(config: AppConfig) -> Result<(), AppError> {
         && admin::bind_host_allows_admin_endpoints(config.server.bind_host.as_str());
     let require_state = config.oauth.require_state;
     let signing_algorithm = config.oauth.signing_algorithm.clone();
+    let gateway_enabled = config.gateway.enabled;
+    let gateway_mode = config.gateway.mode.clone();
+    let gateway_routes = config.gateway.routes.iter().filter(|route| route.enabled).count();
     let server = spawn(config).await?;
     let base_url = server.base_url();
     tracing::info!(%base_url, "oauth2 mock server running");
@@ -140,11 +143,21 @@ pub async fn run(config: AppConfig) -> Result<(), AppError> {
     }
     tracing::info!(authorize = %format!("{base_url}/authorize"), "authorize endpoint");
     tracing::info!(token = %format!("{base_url}/token"), "token endpoint");
+    if gateway_enabled {
+        tracing::info!(
+            gateway_mode = ?gateway_mode,
+            gateway_routes,
+            "gateway routing enabled"
+        );
+    } else {
+        tracing::info!("gateway routing disabled");
+    }
     tracing::info!(
         runtime_client_registration_enabled,
         health_endpoint_enabled,
         admin_endpoints_enabled,
         require_state,
+        gateway_enabled,
         signing_algorithm = %signing_algorithm,
         "runtime settings applied"
     );

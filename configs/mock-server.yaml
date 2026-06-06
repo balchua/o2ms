@@ -44,6 +44,26 @@ oauth:
   signing_algorithm: RS256
   signing_key_strategy: ephemeral_rsa
 
+gateway:
+  enabled: false
+  mode: oauth_only
+  timeout_ms: 2000
+  max_body_bytes: 1048576
+  auth:
+    validate_with_local_oauth: true
+    outbound_header_name: Authorization
+    outbound_value_format: bearer
+  routes: []
+  # Example route:
+  # routes:
+  #   - id: users-api
+  #     enabled: true
+  #     path_prefix: /proxy/users
+  #     upstream_base_url: http://127.0.0.1:9001
+  #     auth_required: true
+  #     outbound_header_name: X-Forwarded-Access-Token
+  #     outbound_value_format: raw
+
 token_response:
   emit_json_body: true
   emit_headers: []
