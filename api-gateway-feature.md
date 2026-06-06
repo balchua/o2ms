@@ -32,6 +32,7 @@ The gateway should:
 - Forward or map bearer tokens into configurable outbound headers.
 - Be easy to configure from YAML.
 - Avoid high resource consumption (minimal allocations, no heavyweight plugin/runtime model).
+- Include a practical Java/Spring Boot client example that calls APIs through the gateway for end-to-end dev/testing.
 
 This is meant to emulate a basic Kong-like local gateway flow, not replace full Kong capabilities.
 
@@ -199,6 +200,22 @@ To keep it lightweight:
   - header rewrite conflicts.
 - Add API documentation for gateway routes and behavior examples.
 
+## 8.1 Example app coverage (Spring Boot + Java client)
+
+The feature also needs runnable example coverage similar to the existing Spring Boot sample:
+
+- Extend the Spring Boot example set with a gateway-focused scenario.
+- Add a Java client flow that:
+  - obtains token from the mock OAuth server,
+  - calls gateway endpoint,
+  - demonstrates gateway pass-through to upstream API with configurable auth-header mapping.
+- Keep the Java example aligned with user preference:
+  - Maven build,
+  - Spring Boot 4 baseline,
+  - simple local run instructions.
+
+---
+
 ---
 
 ## 9) Detailed implementation task breakdown (short-spurt tasks)
@@ -324,6 +341,40 @@ Each task is intentionally small and independently reviewable.
 - Verify docs consistency and examples.
 - Re-check token redaction in logs and security posture.
 
+### Task 24 — Add Spring Boot gateway integration example design
+
+- Define example topology: OAuth mock server + gateway routes + sample upstream API.
+- Reuse existing Spring Boot example structure where possible to avoid heavy new project setup.
+- Document expected local ports and request flow diagram.
+
+### Task 25 — Add Java client-through-gateway implementation task
+
+- Add Maven-based Java client sample (or Spring Boot module) that requests token and calls gateway path.
+- Include configurable gateway base URL and client credentials via environment variables.
+- Keep client code intentionally minimal for dev/test reproducibility.
+
+### Task 26 — Add gateway example YAML profiles
+
+- Add dedicated YAML config profile(s) for gateway example scenarios (OAuth-only and combined mode).
+- Preconfigure at least one upstream route and auth-header forwarding behavior.
+- Ensure examples stay safe-by-default and local-only.
+
+### Task 27 — Add end-to-end example documentation set
+
+- Update `docs/springboot.md` with a gateway-specific section and runbook.
+- Add or update gateway-focused docs (for example `docs/gateway.md`) to include:
+  - architecture overview,
+  - config reference links,
+  - Java client walkthrough,
+  - troubleshooting matrix.
+- Add curl and Java client verification steps for token and proxied API calls.
+
+### Task 28 — Add example validation tasks
+
+- Add automated smoke tests or scripted verification for the example happy path.
+- Validate that example instructions are executable from a clean checkout.
+- Confirm docs are synchronized with committed config/example code.
+
 ---
 
 ## 10) Rollout suggestion
@@ -332,7 +383,8 @@ Each task is intentionally small and independently reviewable.
   1. config + validation,
   2. runtime proxy/auth internals,
   3. router integration + tests,
-  4. documentation and examples.
+  4. Java/Spring Boot gateway example and YAML profiles,
+  5. documentation and examples.
 
 This sequence keeps each PR small and enables short implementation spurts.
 
@@ -352,3 +404,5 @@ Please confirm these before implementation:
 8. Do you want request/response body size limits configurable per route, or global-only in v1?
 9. Should gateway routes support request path rewrite templates beyond simple prefix-strip (for example `/a/* -> /v1/*`)?
 10. What is your preferred default timeout for upstream calls in dev/test?
+11. Should the Java example be a new Spring Boot module in `examples/` or an extension of the existing `springboot-v4-resource-server` app?
+12. Do you want the Java client example to use `RestClient` only, or include `WebClient` variant too?
