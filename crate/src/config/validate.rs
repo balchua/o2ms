@@ -77,12 +77,14 @@ fn validate_gateway(config: &AppConfig) -> Result<(), AppError> {
         ));
     }
 
-    HeaderName::from_bytes(config.gateway.auth.outbound_header_name.as_bytes()).map_err(|error| {
-        AppError::InvalidConfig(format!(
-            "gateway.auth.outbound_header_name '{}' is invalid: {error}",
-            config.gateway.auth.outbound_header_name
-        ))
-    })?;
+    HeaderName::from_bytes(config.gateway.auth.outbound_header_name.as_bytes()).map_err(
+        |error| {
+            AppError::InvalidConfig(format!(
+                "gateway.auth.outbound_header_name '{}' is invalid: {error}",
+                config.gateway.auth.outbound_header_name
+            ))
+        },
+    )?;
 
     let mut route_ids = HashSet::new();
     for route in &config.gateway.routes {
@@ -252,7 +254,11 @@ fn validate_token_response_config(
 
 fn validate_clients(config: &AppConfig) -> Result<(), AppError> {
     let mut client_ids = HashSet::new();
-    let declared_users: HashSet<&str> = config.users.iter().map(|user| user.user_id.as_str()).collect();
+    let declared_users: HashSet<&str> = config
+        .users
+        .iter()
+        .map(|user| user.user_id.as_str())
+        .collect();
 
     for client in &config.clients {
         validate_client_fields(client, config)?;
@@ -273,7 +279,11 @@ fn validate_clients(config: &AppConfig) -> Result<(), AppError> {
         }
 
         validate_claim_keys(
-            &client.custom_claims.keys().map(String::as_str).collect::<Vec<_>>(),
+            &client
+                .custom_claims
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
             "clients[].custom_claims",
         )?;
         validate_template_refs(&client.claims_template_refs, config, "client")?;
@@ -363,7 +373,11 @@ fn validate_users(config: &AppConfig) -> Result<(), AppError> {
         }
 
         validate_claim_keys(
-            &user.custom_claims.keys().map(String::as_str).collect::<Vec<_>>(),
+            &user
+                .custom_claims
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
             "users[].custom_claims",
         )?;
         validate_template_refs(&user.claims_template_refs, config, "user")?;

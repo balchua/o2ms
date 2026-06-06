@@ -108,11 +108,7 @@ impl Default for OauthConfig {
                 "email".to_string(),
                 "offline_access".to_string(),
             ],
-            supported_claims: vec![
-                "sub".to_string(),
-                "name".to_string(),
-                "email".to_string(),
-            ],
+            supported_claims: vec!["sub".to_string(), "name".to_string(), "email".to_string()],
             token_endpoint_auth_methods: vec![
                 "client_secret_basic".to_string(),
                 "client_secret_post".to_string(),
@@ -393,7 +389,8 @@ users:
     }
 
     #[test]
-    fn gateway_yaml_parses_defaults_and_route_overrides() -> Result<(), Box<dyn std::error::Error>> {
+    fn gateway_yaml_parses_defaults_and_route_overrides() -> Result<(), Box<dyn std::error::Error>>
+    {
         let config: AppConfig = serde_yaml::from_str(
             r"
 gateway:

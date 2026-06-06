@@ -9,8 +9,7 @@ use std::sync::{
 };
 
 #[tokio::test]
-async fn server_exposes_health_and_discovery_endpoints() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn server_exposes_health_and_discovery_endpoints() -> Result<(), Box<dyn std::error::Error>> {
     let server = spawn(AppConfig {
         server: ServerConfig {
             bind_host: "127.0.0.1".to_string(),
@@ -69,7 +68,10 @@ async fn token_endpoint_can_emit_header_only_response() -> Result<(), Box<dyn st
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body("grant_type=client_credentials&client_id=header-only-client&scope=openid")
         .send()
         .await?;
@@ -114,7 +116,10 @@ async fn client_override_can_emit_custom_token_header() -> Result<(), Box<dyn st
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body("grant_type=client_credentials&client_id=override-client&scope=openid")
         .send()
         .await?;
@@ -127,15 +132,18 @@ async fn client_override_can_emit_custom_token_header() -> Result<(), Box<dyn st
         .ok_or("custom token header missing")?
         .to_string();
     let token_json: serde_json::Value = token.json().await?;
-    assert_eq!(token_json["access_token"].as_str(), Some(header_value.as_str()));
+    assert_eq!(
+        token_json["access_token"].as_str(),
+        Some(header_value.as_str())
+    );
 
     server.shutdown().await;
     Ok(())
 }
 
 #[tokio::test]
-async fn runtime_registered_clients_appear_in_admin_listing(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn runtime_registered_clients_appear_in_admin_listing()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.admin.list_clients_endpoint_enabled = true;
@@ -160,9 +168,7 @@ async fn runtime_registered_clients_appear_in_admin_listing(
         .await?;
 
     assert_eq!(registration.status(), reqwest::StatusCode::CREATED);
-    let runtime_client_id = registration
-        .json::<serde_json::Value>()
-        .await?["client_id"]
+    let runtime_client_id = registration.json::<serde_json::Value>().await?["client_id"]
         .as_str()
         .ok_or("runtime client id missing")?
         .to_string();
@@ -174,26 +180,32 @@ async fn runtime_registered_clients_appear_in_admin_listing(
 
     assert!(listed_clients.status().is_success());
     let listed_clients_json = listed_clients.json::<serde_json::Value>().await?;
-    assert!(listed_clients_json
-        .as_array()
-        .ok_or("admin clients response must be an array")?
-        .iter()
-        .any(|entry| entry["client_id"].as_str() == Some("seeded-client")
-            && entry["source"].as_str() == Some("preloaded")));
-    assert!(listed_clients_json
-        .as_array()
-        .ok_or("admin clients response must be an array")?
-        .iter()
-        .any(|entry| entry["client_id"].as_str() == Some(runtime_client_id.as_str())
-            && entry["source"].as_str() == Some("runtime")));
+    assert!(
+        listed_clients_json
+            .as_array()
+            .ok_or("admin clients response must be an array")?
+            .iter()
+            .any(|entry| entry["client_id"].as_str() == Some("seeded-client")
+                && entry["source"].as_str() == Some("preloaded"))
+    );
+    assert!(
+        listed_clients_json
+            .as_array()
+            .ok_or("admin clients response must be an array")?
+            .iter()
+            .any(
+                |entry| entry["client_id"].as_str() == Some(runtime_client_id.as_str())
+                    && entry["source"].as_str() == Some("runtime")
+            )
+    );
 
     server.shutdown().await;
     Ok(())
 }
 
 #[tokio::test]
-async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.admin.list_clients_endpoint_enabled = true;
@@ -209,13 +221,14 @@ async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients(
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body("grant_type=client_credentials&client_id=seeded-client&scope=openid")
         .send()
         .await?;
-    let access_token = token
-        .json::<serde_json::Value>()
-        .await?["access_token"]
+    let access_token = token.json::<serde_json::Value>().await?["access_token"]
         .as_str()
         .ok_or("access token missing")?
         .to_string();
@@ -230,9 +243,7 @@ async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients(
         }))
         .send()
         .await?;
-    let runtime_client_id = registration
-        .json::<serde_json::Value>()
-        .await?["client_id"]
+    let runtime_client_id = registration.json::<serde_json::Value>().await?["client_id"]
         .as_str()
         .ok_or("runtime client id missing")?
         .to_string();
@@ -255,12 +266,16 @@ async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients(
     let listed_array = listed_clients_json
         .as_array()
         .ok_or("admin clients response must be an array")?;
-    assert!(listed_array
-        .iter()
-        .any(|entry| entry["client_id"].as_str() == Some("seeded-client")));
-    assert!(!listed_array
-        .iter()
-        .any(|entry| entry["client_id"].as_str() == Some(runtime_client_id.as_str())));
+    assert!(
+        listed_array
+            .iter()
+            .any(|entry| entry["client_id"].as_str() == Some("seeded-client"))
+    );
+    assert!(
+        !listed_array
+            .iter()
+            .any(|entry| entry["client_id"].as_str() == Some(runtime_client_id.as_str()))
+    );
 
     let userinfo = client
         .get(format!("{}/userinfo", server.base_url()))
@@ -292,7 +307,10 @@ async fn preloaded_client_can_use_token_endpoint() -> Result<(), Box<dyn std::er
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body("grant_type=client_credentials&client_id=seeded-client&scope=openid")
         .send()
         .await?;
@@ -307,8 +325,8 @@ async fn preloaded_client_can_use_token_endpoint() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
-async fn configured_claims_are_embedded_in_issued_access_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn configured_claims_are_embedded_in_issued_access_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.clients = vec![oauth2_mock_server::ClientConfig {
@@ -325,10 +343,7 @@ async fn configured_claims_are_embedded_in_issued_access_tokens(
     }];
     config.claims_templates = std::collections::BTreeMap::from([(
         "shared".to_string(),
-        std::collections::BTreeMap::from([(
-            "authorizations".to_string(),
-            serde_json::json!([]),
-        )]),
+        std::collections::BTreeMap::from([("authorizations".to_string(), serde_json::json!([]))]),
     )]);
 
     let server = spawn(config).await?;
@@ -336,7 +351,10 @@ async fn configured_claims_are_embedded_in_issued_access_tokens(
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body("grant_type=client_credentials&client_id=claims-client&scope=openid")
         .send()
         .await?;
@@ -357,8 +375,8 @@ async fn configured_claims_are_embedded_in_issued_access_tokens(
 }
 
 #[tokio::test]
-async fn configured_user_becomes_default_authorization_flow_subject(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn configured_user_becomes_default_authorization_flow_subject()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.oauth.require_state = false;
@@ -413,7 +431,10 @@ async fn configured_user_becomes_default_authorization_flow_subject(
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body(format!(
             "grant_type=authorization_code&client_id=auth-client&code={code}"
         ))
@@ -441,8 +462,8 @@ async fn configured_user_becomes_default_authorization_flow_subject(
 }
 
 #[tokio::test]
-async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.oauth.require_state = false;
@@ -523,7 +544,10 @@ async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code
 
     let token = client
         .post(format!("{}/token", server.base_url()))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
         .body(format!(
             "grant_type=authorization_code&client_id=picker-client&code={code}"
         ))
@@ -551,7 +575,8 @@ async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code
 }
 
 #[tokio::test]
-async fn gateway_forwards_request_with_valid_local_token() -> Result<(), Box<dyn std::error::Error>> {
+async fn gateway_forwards_request_with_valid_local_token() -> Result<(), Box<dyn std::error::Error>>
+{
     let request_counter = Arc::new(AtomicUsize::new(0));
     let upstream = spawn_test_upstream(request_counter.clone(), false).await?;
 
@@ -588,9 +613,11 @@ async fn gateway_forwards_request_with_valid_local_token() -> Result<(), Box<dyn
     assert!(response.status().is_success());
     let body = response.json::<serde_json::Value>().await?;
     assert_eq!(body["path"], "/me");
-    assert!(body["authorization"]
-        .as_str()
-        .is_some_and(|header| header.starts_with("Bearer ")));
+    assert!(
+        body["authorization"]
+            .as_str()
+            .is_some_and(|header| header.starts_with("Bearer "))
+    );
     assert_eq!(request_counter.load(Ordering::SeqCst), 1);
 
     server.shutdown().await;
@@ -599,8 +626,8 @@ async fn gateway_forwards_request_with_valid_local_token() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn gateway_rejects_invalid_or_missing_token_without_upstream_call(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn gateway_rejects_invalid_or_missing_token_without_upstream_call()
+-> Result<(), Box<dyn std::error::Error>> {
     let request_counter = Arc::new(AtomicUsize::new(0));
     let upstream = spawn_test_upstream(request_counter.clone(), false).await?;
 
@@ -695,8 +722,13 @@ async fn issue_client_token(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let token = client
         .post(format!("{base_url}/token"))
-        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-        .body(format!("grant_type=client_credentials&client_id={client_id}&scope=openid"))
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .body(format!(
+            "grant_type=client_credentials&client_id={client_id}&scope=openid"
+        ))
         .send()
         .await?;
     let token_json = token.json::<serde_json::Value>().await?;
@@ -767,7 +799,7 @@ async fn spawn_test_upstream(
     };
     let app = Router::new()
         .route("/", get(upstream_handler))
-        .route("/*path", get(upstream_handler))
+        .route("/{*path}", get(upstream_handler))
         .with_state(state);
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;

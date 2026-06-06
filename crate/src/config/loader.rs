@@ -3,7 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use config::{builder::DefaultState, Config as RawConfig, ConfigBuilder, Environment, File, FileFormat};
+use config::{
+    Config as RawConfig, ConfigBuilder, Environment, File, FileFormat, builder::DefaultState,
+};
 
 use crate::{cli::CliOptions, config::model::AppConfig, error::AppError};
 
@@ -104,10 +106,10 @@ pub fn load_from_sources_with_overrides(overrides: &CliOptions) -> Result<AppCon
         builder = builder.set_override("server.log_level", log_level.clone())?;
     }
     if let Some(health_endpoint_enabled) = overrides.health_endpoint_enabled {
-        builder = builder.set_override("server.health_endpoint_enabled", health_endpoint_enabled)?;
+        builder =
+            builder.set_override("server.health_endpoint_enabled", health_endpoint_enabled)?;
     }
-    if let Some(runtime_client_registration_enabled) =
-        overrides.runtime_client_registration_enabled
+    if let Some(runtime_client_registration_enabled) = overrides.runtime_client_registration_enabled
     {
         builder = builder.set_override(
             "server.runtime_client_registration_enabled",
@@ -195,7 +197,8 @@ issuer:
     }
 
     #[test]
-    fn layered_overrides_apply_to_runtime_and_oauth_settings() -> Result<(), Box<dyn std::error::Error>> {
+    fn layered_overrides_apply_to_runtime_and_oauth_settings()
+    -> Result<(), Box<dyn std::error::Error>> {
         let builder = RawConfig::builder()
             .set_override("server.bind_port", 9191)?
             .set_override("issuer.base_url", "http://127.0.0.1:9191")?
@@ -240,11 +243,9 @@ issuer:
             .set_override("gateway.enabled", true)?
             .set_override("gateway.mode", "oauth_and_gateway")?
             .set_override("gateway.timeout_ms", 1500_u64)?
-            .set_override("gateway.routes", vec![serde_json::json!({
-                "id": "users",
-                "path_prefix": "/proxy/users",
-                "upstream_base_url": "http://127.0.0.1:9001",
-            })])?;
+            .set_override("gateway.routes[0].id", "users")?
+            .set_override("gateway.routes[0].path_prefix", "/proxy/users")?
+            .set_override("gateway.routes[0].upstream_base_url", "http://127.0.0.1:9001")?;
 
         let config = load_from_builder(builder)?;
         assert!(config.gateway.enabled);

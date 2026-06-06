@@ -3,10 +3,10 @@ use std::time::Duration;
 use axum::{
     body::{Body, Bytes},
     extract::State,
-    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
+    http::{HeaderMap, HeaderName, Method, StatusCode, Uri},
     response::{IntoResponse, Response},
 };
-use oauth2_test_server::handlers::userinfo::userinfo;
+use jsonwebtoken::{Algorithm, Validation, decode};
 use reqwest::Client;
 use url::Url;
 
@@ -35,6 +35,11 @@ struct CompiledRoute {
 }
 
 impl GatewayRuntime {
+    /// Build a gateway runtime from config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when HTTP client creation or route compilation fails.
     pub fn from_config(config: &GatewayConfig) -> Result<Option<Self>, String> {
         if !config.enabled {
             return Ok(None);
@@ -45,13 +50,15 @@ impl GatewayRuntime {
             .build()
             .map_err(|error| format!("failed to build gateway HTTP client: {error}"))?;
 
-        let default_outbound_header_name =
-            HeaderName::from_bytes(config.auth.outbound_header_name.as_bytes()).map_err(|error| {
-                format!(
-                    "invalid gateway.auth.outbound_header_name '{}': {error}",
-                    config.auth.outbound_header_name
-                )
-            })?;
+        let default_outbound_header_name = HeaderName::from_bytes(
+            config.auth.outbound_header_name.as_bytes(),
+        )
+        .map_err(|error| {
+            format!(
+                "invalid gateway.auth.outbound_header_name '{}': {error}",
+                config.auth.outbound_header_name
+            )
+        })?;
 
         let mut routes = Vec::new();
         for route in &config.routes {
@@ -61,7 +68,7 @@ impl GatewayRuntime {
             routes.push(compile_route(route)?);
         }
 
-        routes.sort_by(|left, right| right.path_prefix.len().cmp(&left.path_prefix.len()));
+        routes.sort_by_key(|route| std::cmp::Reverse(route.path_prefix.len()));
 
         Ok(Some(Self {
             client,
@@ -74,7 +81,10 @@ impl GatewayRuntime {
 
     fn find_route(&self, path: &str) -> Option<&CompiledRoute> {
         self.routes.iter().find(|route| {
-            path == route.path_prefix || path.strip_prefix(&route.path_prefix).is_some_and(|suffix| suffix.starts_with('/'))
+            path == route.path_prefix
+                || path
+                    .strip_prefix(&route.path_prefix)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
         })
     }
 }
@@ -120,21 +130,19 @@ pub async fn proxy_request(
     let Some(route) = runtime.find_route(path) else {
         return StatusCode::NOT_FOUND.into_response();
     };
+    tracing::debug!(route_id = %route.id, path, "gateway route matched");
 
     let bearer_token = extract_bearer_token(&headers);
     if route.auth_required {
         let Some(token) = bearer_token.as_deref() else {
             return gateway_error(StatusCode::UNAUTHORIZED, "missing_bearer_token");
         };
-        if !token_is_valid(&state, token).await {
+        if !token_is_valid(&state, token) {
             return gateway_error(StatusCode::UNAUTHORIZED, "invalid_bearer_token");
         }
     }
 
-    let upstream_url = match build_upstream_url(route, &uri) {
-        Ok(url) => url,
-        Err(error) => return gateway_error(StatusCode::BAD_REQUEST, &error),
-    };
+    let upstream_url = build_upstream_url(route, &uri);
 
     let mut request_builder = runtime.client.request(method.clone(), upstream_url);
     for (header_name, header_value) in &headers {
@@ -167,11 +175,8 @@ pub async fn proxy_request(
 
     let status = upstream_response.status();
     let headers = upstream_response.headers().clone();
-    let response_body = match upstream_response.bytes().await {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return gateway_error(StatusCode::BAD_GATEWAY, "upstream_response_read_failed");
-        }
+    let Ok(response_body) = upstream_response.bytes().await else {
+        return gateway_error(StatusCode::BAD_GATEWAY, "upstream_response_read_failed");
     };
     if response_body.len() > runtime.max_body_bytes {
         return gateway_error(StatusCode::BAD_GATEWAY, "upstream_response_too_large");
@@ -223,7 +228,7 @@ fn format_outbound_token(token: &str, format: &HeaderValueFormat) -> String {
     }
 }
 
-fn build_upstream_url(route: &CompiledRoute, uri: &Uri) -> Result<Url, String> {
+fn build_upstream_url(route: &CompiledRoute, uri: &Uri) -> Url {
     let mut upstream_url = route.upstream_base_url.clone();
     let suffix = uri.path().trim_start_matches(&route.path_prefix);
 
@@ -238,20 +243,21 @@ fn build_upstream_url(route: &CompiledRoute, uri: &Uri) -> Result<Url, String> {
 
     upstream_url.set_path(&upstream_path);
     upstream_url.set_query(uri.query());
-    Ok(upstream_url)
+    upstream_url
 }
 
-async fn token_is_valid(state: &WrapperState, token: &str) -> bool {
-    let mut headers = HeaderMap::new();
-    let Ok(value) = HeaderValue::from_str(&format!("{} {}", "Bearer", token)) else {
-        return false;
-    };
-    headers.insert(axum::http::header::AUTHORIZATION, value);
-    userinfo(headers, State(state.upstream.clone())).await.is_ok()
+fn token_is_valid(state: &WrapperState, token: &str) -> bool {
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.validate_aud = false;
+    decode::<serde_json::Value>(token, &state.upstream.keys.decoding, &validation).is_ok()
 }
 
 fn gateway_error(status: StatusCode, code: &str) -> Response {
-    (status, [("content-type", "application/json")], format!(r#"{{"error":"{code}"}}"#))
+    (
+        status,
+        [("content-type", "application/json")],
+        format!(r#"{{"error":"{code}"}}"#),
+    )
         .into_response()
 }
 
@@ -299,7 +305,7 @@ mod tests {
             ..GatewayRouteConfig::default()
         })?;
         let uri: axum::http::Uri = "/proxy/users/me?id=1".parse()?;
-        let url = build_upstream_url(&route, &uri)?;
+        let url = build_upstream_url(&route, &uri);
         assert_eq!(url.as_str(), "http://127.0.0.1:9001/api/me?id=1");
         Ok(())
     }
@@ -307,12 +313,14 @@ mod tests {
     #[test]
     fn extracts_bearer_token_from_authorization_header() {
         let mut headers = axum::http::HeaderMap::new();
-        let value = format!("{} {}", "Bearer", "token-value");
         headers.insert(
             axum::http::header::AUTHORIZATION,
-            axum::http::HeaderValue::from_str(value.as_str()).expect("valid bearer header"),
+            axum::http::HeaderValue::from_static("bearer token-value"),
         );
-        assert_eq!(extract_bearer_token(&headers).as_deref(), Some("token-value"));
+        assert_eq!(
+            extract_bearer_token(&headers).as_deref(),
+            Some("token-value")
+        );
     }
 
     #[test]

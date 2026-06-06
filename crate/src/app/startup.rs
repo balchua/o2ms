@@ -67,14 +67,17 @@ pub async fn spawn(config: AppConfig) -> Result<RunningServer, AppError> {
     } else {
         tracing::info!("no enabled configured users found; using upstream fallback default user");
     }
-    let listener = TcpListener::bind((config.server.bind_host.as_str(), config.server.bind_port))
-        .await?;
+    let listener =
+        TcpListener::bind((config.server.bind_host.as_str(), config.server.bind_port)).await?;
     let addr = listener.local_addr()?;
     tracing::info!(%addr, "oauth2 mock server bound successfully");
 
     let upstream_state = build_upstream_state(&config, addr.port());
     let seeded_clients = seed_clients(&config, &upstream_state).await?;
-    tracing::info!(seeded_clients, "preloaded configured clients into oauth store");
+    tracing::info!(
+        seeded_clients,
+        "preloaded configured clients into oauth store"
+    );
     let wrapper_state = WrapperState::new(config.clone(), upstream_state)?;
     let router = build_router(&config, wrapper_state);
 
@@ -106,7 +109,12 @@ pub async fn run(config: AppConfig) -> Result<(), AppError> {
     let signing_algorithm = config.oauth.signing_algorithm.clone();
     let gateway_enabled = config.gateway.enabled;
     let gateway_mode = config.gateway.mode.clone();
-    let gateway_routes = config.gateway.routes.iter().filter(|route| route.enabled).count();
+    let gateway_routes = config
+        .gateway
+        .routes
+        .iter()
+        .filter(|route| route.enabled)
+        .count();
     let server = spawn(config).await?;
     let base_url = server.base_url();
     tracing::info!(%base_url, "oauth2 mock server running");

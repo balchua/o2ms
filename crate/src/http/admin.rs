@@ -143,8 +143,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_clients_route_returns_preloaded_clients(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn list_clients_route_returns_preloaded_clients() -> Result<(), Box<dyn std::error::Error>>
+    {
         let mut config = AppConfig::default();
         config.admin.list_clients_endpoint_enabled = true;
         config.clients = vec![ClientConfig {
