@@ -48,7 +48,7 @@ This is meant to emulate a basic Kong-like local gateway flow, not replace full 
   - read bearer token from incoming request (header/cookie/query optionality to be confirmed),
   - write token to configurable outbound header name,
   - configurable value format (`bearer <token>` vs raw token).
-- Mode switch(es) for OAuth-only vs combined (and maybe gateway-only).
+- Mode switch(es) for OAuth-only vs combined.
 - Basic observability and error mapping suitable for local debugging.
 
 ### Out of scope (initial version)
@@ -89,10 +89,12 @@ This is meant to emulate a basic Kong-like local gateway flow, not replace full 
 1. Incoming request hits configured gateway route.
 2. Match route and build upstream URL (base + remaining path + query handling rules).
 3. Extract bearer token (default: `Authorization` request header).
-4. Write token to outbound header (default configurable, e.g. `Authorization` or `X-Forwarded-Access-Token`).
-5. Forward method/body/selected headers to upstream.
-6. Return upstream response status/body/headers with safe filtering policy.
-7. Emit tracing logs for route match, upstream target, duration, and failures.
+4. Validate token with this server's own OAuth/JWT verification pipeline.
+5. If token is invalid/expired/malformed, return `401` immediately to the client and do not call upstream.
+6. Write token to outbound header (default configurable, e.g. `Authorization` or `X-Forwarded-Access-Token`).
+7. Forward method/body/selected headers to upstream.
+8. Return upstream response status/body/headers with safe filtering policy.
+9. Emit tracing logs for route match, upstream target, duration, and failures.
 
 ---
 
@@ -112,6 +114,7 @@ gateway:
       - accept
       - x-request-id
   auth:
+    validate_with_local_oauth: true
     token_sources:
       authorization_header: true
       cookie_name: null
@@ -145,6 +148,7 @@ gateway:
 - `gateway.mode`:
   - `oauth_only`: no gateway route mounting.
   - `oauth_and_gateway`: OAuth + gateway routes active.
+- `gateway.auth.validate_with_local_oauth`: gateway must validate inbound bearer tokens using this server's own OAuth/JWT verification before proxying.
 - Global `gateway.auth.outbound.*` is default, route-level values can override.
 - Each `routes[]` item has independent auth settings and upstream mapping.
 - Token pass-through behavior is configurable without code changes.
@@ -156,6 +160,7 @@ gateway:
 - `path_prefix` must start with `/`.
 - `strip_prefix` must be compatible with `path_prefix`.
 - gateway route prefixes must not overlap reserved endpoints (`/token`, `/authorize`, `/.well-known/*`, `/admin/*`, `/health`, etc.).
+- `validate_with_local_oauth` must remain true in v1.
 - when `required=true` and `passthrough_mode=from_request`, at least one token source must be enabled.
 - header names must be valid HTTP header names.
 
@@ -179,6 +184,7 @@ To keep it lightweight:
 - Do not log raw bearer tokens.
 - Support required-auth vs optional-auth per route.
 - Reject missing token with `401` when route requires auth.
+- Reject invalid or expired token with immediate `401` before upstream call.
 - Return `502/504` style errors for upstream failures/timeouts.
 - Header forwarding via allowlist to reduce accidental leakage.
 - Optional fixed-token mode only for controlled dev/test simulation.
@@ -194,6 +200,7 @@ To keep it lightweight:
   - status and duration.
 - Structured warning/error logs for:
   - missing token,
+  - invalid token,
   - invalid config,
   - upstream unavailability,
   - header rewrite conflicts.
@@ -262,6 +269,11 @@ Each task is intentionally small and independently reviewable.
 - Extract token from configured source(s) with deterministic precedence.
 - Return explicit typed errors for missing/malformed tokens.
 
+### Task 8.1 — Validate inbound token with local OAuth/JWT verifier
+
+- Validate each extracted bearer token using this server's own OAuth/JWT validation path.
+- Return `401` immediately on invalid/expired token and skip any upstream call.
+
 ### Task 9 — Implement outbound auth header formatter
 
 - Convert token to outbound header per configured name and value format.
@@ -292,8 +304,7 @@ Each task is intentionally small and independently reviewable.
 
 - Integrate into router builder:
   - OAuth-only unchanged,
-  - combined mode mounts both,
-  - gateway-only behavior if approved.
+  - combined mode mounts both.
 - Add router tests for each mode.
 
 ### Task 15 — Add integration tests for happy-path proxying
