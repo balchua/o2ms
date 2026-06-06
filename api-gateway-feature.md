@@ -103,7 +103,7 @@ Add a top-level section:
 ```yaml
 gateway:
   enabled: false
-  mode: oauth_only # oauth_only | oauth_and_gateway | gateway_only (optional)
+  mode: oauth_only # oauth_only | oauth_and_gateway
   timeout_ms: 5000
   max_response_body_bytes: 1048576
   forward_headers:
@@ -145,7 +145,6 @@ gateway:
 - `gateway.mode`:
   - `oauth_only`: no gateway route mounting.
   - `oauth_and_gateway`: OAuth + gateway routes active.
-  - `gateway_only`: only gateway routes active (pending confirmation).
 - Global `gateway.auth.outbound.*` is default, route-level values can override.
 - Each `routes[]` item has independent auth settings and upstream mapping.
 - Token pass-through behavior is configurable without code changes.
@@ -394,7 +393,7 @@ This sequence keeps each PR small and enables short implementation spurts.
 
 Please confirm these before implementation:
 
-1. Do you want **gateway-only mode** in v1, or only `oauth_only` and `oauth_and_gateway`?
+1. Confirmed: v1 supports only `oauth_only` and `oauth_and_gateway`; OAuth remains enabled whenever gateway is enabled.
 2. Should token extraction support only `Authorization: Bearer` initially, or also cookie/query sources in v1?
 3. For outbound auth header, should default be `Authorization` or a custom header like `X-Forwarded-Access-Token`?
 4. Should we allow **fixed token** per route for service-to-service mock scenarios, or strictly pass-through only?
