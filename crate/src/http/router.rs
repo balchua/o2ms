@@ -1,9 +1,14 @@
-use axum::{
-    http::{self, header, HeaderValue},
-    routing::{get, post},
-    Router,
+use crate::{
+    app::state::WrapperState,
+    config::model::{AppConfig, GatewayMode},
+    gateway,
 };
-use crate::{app::state::WrapperState, config::model::AppConfig};
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    http::{self, HeaderValue, header},
+    routing::{any, get, post},
+};
 use tower_http::{
     cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
@@ -21,15 +26,12 @@ pub fn build_router(config: &AppConfig, state: WrapperState) -> Router {
     }
 
     router = router
+        .route("/.well-known/openid-configuration", get(oauth::discovery))
+        .route("/.well-known/jwks.json", get(oauth::jwks_doc))
         .route(
-            "/.well-known/openid-configuration",
-            get(oauth::discovery),
+            "/authorize",
+            get(oauth::authorize_flow).post(oauth::authorize_submit),
         )
-        .route(
-            "/.well-known/jwks.json",
-            get(oauth::jwks_doc),
-        )
-        .route("/authorize", get(oauth::authorize_flow).post(oauth::authorize_submit))
         .route("/token", post(oauth::token_endpoint))
         .route("/device/code", post(oauth::device_code_proxy))
         .route("/device/token", post(oauth::device_token_proxy))
@@ -46,14 +48,15 @@ pub fn build_router(config: &AppConfig, state: WrapperState) -> Router {
 
     if config.server.runtime_client_registration_enabled {
         router = router
-            .route(
-                "/register",
-                post(oauth::register_client_proxy),
-            )
-            .route(
-                "/register/{client_id}",
-                get(oauth::get_client_proxy),
-            );
+            .route("/register", post(oauth::register_client_proxy))
+            .route("/register/{client_id}", get(oauth::get_client_proxy));
+    }
+
+    if config.gateway.enabled && config.gateway.mode == GatewayMode::OauthAndGateway {
+        router = router
+            .route("/", any(gateway::proxy_request))
+            .route("/{*path}", any(gateway::proxy_request))
+            .layer(DefaultBodyLimit::max(config.gateway.max_body_bytes));
     }
 
     router.with_state(state)
@@ -107,16 +110,14 @@ mod tests {
     use super::build_router;
 
     #[tokio::test]
-    async fn health_endpoint_is_available_on_wrapper_router(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn health_endpoint_is_available_on_wrapper_router()
+    -> Result<(), Box<dyn std::error::Error>> {
         let upstream = build_upstream_state(&AppConfig::default(), 8090);
         let app = build_router(
             &AppConfig::default(),
-            WrapperState::new(AppConfig::default(), upstream),
+            WrapperState::new(AppConfig::default(), upstream)?,
         );
-        let request = Request::builder()
-            .uri("/health")
-            .body(Body::empty())?;
+        let request = Request::builder().uri("/health").body(Body::empty())?;
 
         let response = app.oneshot(request).await?;
 
@@ -129,10 +130,8 @@ mod tests {
         let mut config = AppConfig::default();
         config.server.health_endpoint_enabled = false;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
-        let request = Request::builder()
-            .uri("/health")
-            .body(Body::empty())?;
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
+        let request = Request::builder().uri("/health").body(Body::empty())?;
 
         let response = app.oneshot(request).await?;
 
@@ -145,7 +144,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.server.runtime_client_registration_enabled = false;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .method(http::Method::POST)
             .uri("/register")
@@ -163,7 +162,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.admin.list_clients_endpoint_enabled = true;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .uri("/admin/clients")
             .body(Body::empty())?;
@@ -175,13 +174,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn admin_endpoints_are_not_mounted_for_non_loopback_bind_host(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn admin_endpoints_are_not_mounted_for_non_loopback_bind_host()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut config = AppConfig::default();
         config.server.bind_host = "0.0.0.0".to_string();
         config.admin.list_clients_endpoint_enabled = true;
         let upstream = build_upstream_state(&config, 8090);
-        let app = build_router(&config, WrapperState::new(config.clone(), upstream));
+        let app = build_router(&config, WrapperState::new(config.clone(), upstream)?);
         let request = Request::builder()
             .uri("/admin/clients")
             .body(Body::empty())?;

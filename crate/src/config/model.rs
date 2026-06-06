@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub issuer: IssuerConfig,
     pub oauth: OauthConfig,
+    pub gateway: GatewayConfig,
     pub token_response: TokenResponseConfig,
     pub clients: Vec<ClientConfig>,
     pub users: Vec<UserConfig>,
@@ -107,11 +108,7 @@ impl Default for OauthConfig {
                 "email".to_string(),
                 "offline_access".to_string(),
             ],
-            supported_claims: vec![
-                "sub".to_string(),
-                "name".to_string(),
-                "email".to_string(),
-            ],
+            supported_claims: vec!["sub".to_string(), "name".to_string(), "email".to_string()],
             token_endpoint_auth_methods: vec![
                 "client_secret_basic".to_string(),
                 "client_secret_post".to_string(),
@@ -121,6 +118,82 @@ impl Default for OauthConfig {
             code_challenge_methods: vec!["plain".to_string(), "S256".to_string()],
             signing_algorithm: "RS256".to_string(),
             signing_key_strategy: "ephemeral_rsa".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct GatewayConfig {
+    pub enabled: bool,
+    pub mode: GatewayMode,
+    pub timeout_ms: u64,
+    pub max_body_bytes: usize,
+    pub auth: GatewayAuthConfig,
+    pub routes: Vec<GatewayRouteConfig>,
+}
+
+impl Default for GatewayConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: GatewayMode::OauthOnly,
+            timeout_ms: 2_000,
+            max_body_bytes: 1_048_576,
+            auth: GatewayAuthConfig::default(),
+            routes: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GatewayMode {
+    #[default]
+    OauthOnly,
+    OauthAndGateway,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct GatewayAuthConfig {
+    pub validate_with_local_oauth: bool,
+    pub outbound_header_name: String,
+    pub outbound_value_format: HeaderValueFormat,
+}
+
+impl Default for GatewayAuthConfig {
+    fn default() -> Self {
+        Self {
+            validate_with_local_oauth: true,
+            outbound_header_name: "Authorization".to_string(),
+            outbound_value_format: HeaderValueFormat::Bearer,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct GatewayRouteConfig {
+    pub id: String,
+    pub enabled: bool,
+    pub path_prefix: String,
+    pub upstream_base_url: String,
+    pub auth_required: bool,
+    pub outbound_header_name: Option<String>,
+    pub outbound_value_format: Option<HeaderValueFormat>,
+}
+
+impl Default for GatewayRouteConfig {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            enabled: true,
+            path_prefix: String::new(),
+            upstream_base_url: String::new(),
+            auth_required: true,
+            outbound_header_name: None,
+            outbound_value_format: None,
         }
     }
 }
@@ -262,7 +335,7 @@ pub struct AdminConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, HeaderValueFormat, TokenField};
+    use super::{AppConfig, GatewayMode, HeaderValueFormat, TokenField};
 
     #[test]
     fn default_config_uses_localhost_defaults() {
@@ -272,6 +345,8 @@ mod tests {
         assert_eq!(config.server.bind_port, 8090);
         assert_eq!(config.server.startup_mode, super::StartupMode::Foreground);
         assert_eq!(config.issuer.base_url, "http://127.0.0.1:8090");
+        assert_eq!(config.gateway.mode, GatewayMode::OauthOnly);
+        assert_eq!(config.gateway.timeout_ms, 2_000);
         assert!(config.token_response.emit_json_body);
         assert_eq!(config.oauth.signing_algorithm, "RS256");
         assert!(!config.oauth.authorization_user_picker_enabled);
@@ -311,5 +386,37 @@ users:
         assert_eq!(header.header_name, "Authorization");
         assert_eq!(header.token_field, TokenField::AccessToken);
         assert_eq!(header.value_format, HeaderValueFormat::Bearer);
+    }
+
+    #[test]
+    fn gateway_yaml_parses_defaults_and_route_overrides() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let config: AppConfig = serde_yaml::from_str(
+            r"
+gateway:
+  enabled: true
+  mode: oauth_and_gateway
+  routes:
+    - id: users
+      path_prefix: /proxy/users
+      upstream_base_url: http://127.0.0.1:9001
+      outbound_header_name: X-Forwarded-Access-Token
+      outbound_value_format: raw
+",
+        )?;
+
+        assert!(config.gateway.enabled);
+        assert_eq!(config.gateway.mode, GatewayMode::OauthAndGateway);
+        assert_eq!(config.gateway.timeout_ms, 2_000);
+        assert_eq!(config.gateway.routes.len(), 1);
+        assert_eq!(
+            config.gateway.routes[0].outbound_header_name.as_deref(),
+            Some("X-Forwarded-Access-Token")
+        );
+        assert_eq!(
+            config.gateway.routes[0].outbound_value_format,
+            Some(HeaderValueFormat::Raw)
+        );
+        Ok(())
     }
 }
