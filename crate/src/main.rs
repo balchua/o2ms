@@ -1,13 +1,13 @@
 use std::io::Write;
 
-use oauth2_mock_server::{
+use o2ms::{
     cli::CliOptions,
     config::loader::load_from_sources_with_overrides,
     run,
 };
 
 #[tokio::main]
-async fn main() -> Result<(), oauth2_mock_server::AppError> {
+async fn main() -> Result<(), o2ms::AppError> {
     let cli_options = CliOptions::parse()?;
 
     if cli_options.show_help {

@@ -1223,7 +1223,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "oauth2-mock-server"
+name = "o2ms"
 version = "0.1.0"
 dependencies = [
  "axum",

@@ -126,7 +126,6 @@ impl Default for OauthConfig {
 #[serde(default)]
 pub struct GatewayConfig {
     pub enabled: bool,
-    pub mode: GatewayMode,
     pub timeout_ms: u64,
     pub max_body_bytes: usize,
     pub auth: GatewayAuthConfig,
@@ -137,21 +136,12 @@ impl Default for GatewayConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            mode: GatewayMode::OauthOnly,
             timeout_ms: 2_000,
             max_body_bytes: 1_048_576,
             auth: GatewayAuthConfig::default(),
             routes: Vec::new(),
         }
     }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum GatewayMode {
-    #[default]
-    OauthOnly,
-    OauthAndGateway,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -335,7 +325,7 @@ pub struct AdminConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, GatewayMode, HeaderValueFormat, TokenField};
+    use super::{AppConfig, HeaderValueFormat, TokenField};
 
     #[test]
     fn default_config_uses_localhost_defaults() {
@@ -345,7 +335,7 @@ mod tests {
         assert_eq!(config.server.bind_port, 8090);
         assert_eq!(config.server.startup_mode, super::StartupMode::Foreground);
         assert_eq!(config.issuer.base_url, "http://127.0.0.1:8090");
-        assert_eq!(config.gateway.mode, GatewayMode::OauthOnly);
+        assert!(!config.gateway.enabled);
         assert_eq!(config.gateway.timeout_ms, 2_000);
         assert!(config.token_response.emit_json_body);
         assert_eq!(config.oauth.signing_algorithm, "RS256");
@@ -395,7 +385,6 @@ users:
             r"
 gateway:
   enabled: true
-  mode: oauth_and_gateway
   routes:
     - id: users
       path_prefix: /proxy/users
@@ -406,7 +395,6 @@ gateway:
         )?;
 
         assert!(config.gateway.enabled);
-        assert_eq!(config.gateway.mode, GatewayMode::OauthAndGateway);
         assert_eq!(config.gateway.timeout_ms, 2_000);
         assert_eq!(config.gateway.routes.len(), 1);
         assert_eq!(

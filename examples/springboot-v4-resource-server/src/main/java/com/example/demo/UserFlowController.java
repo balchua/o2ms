@@ -13,7 +13,7 @@ public class UserFlowController {
     @GetMapping("/")
     public Map<String, Object> home() {
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "Spring Boot example app for oauth2-mock-server");
+        response.put("message", "Spring Boot example app for o2ms");
         response.put("picker", "The mock server now shows a simple user picker page during browser login.");
         response.put("browserProtectedResource", "/login/me");
         response.put("loginStart", "/oauth2/authorization/mock");

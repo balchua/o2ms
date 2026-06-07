@@ -4,6 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     Json,
 };
+use base64::{engine::general_purpose, Engine as _};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
 use oauth2_test_server::{
@@ -555,13 +556,98 @@ pub async fn token_endpoint(
     headers: HeaderMap,
     Form(form): Form<TokenRequest>,
 ) -> Result<Response, OauthError> {
-    let _ = headers;
+    if let Err(response) = validate_client_auth(&state, &headers, &form).await {
+        return Ok(response);
+    }
     match form.grant_type.as_str() {
         "authorization_code" => handle_authorization_code(state, form).await,
         "refresh_token" => handle_refresh_token(state, form).await,
         "client_credentials" => handle_client_credentials(state, form).await,
         _ => Err(OauthError::UnsupportedGrantType),
     }
+}
+
+async fn validate_client_auth(
+    state: &WrapperState,
+    headers: &HeaderMap,
+    form: &TokenRequest,
+) -> Result<(), Response> {
+    let Some(client_id) = form.client_id.as_deref() else {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "invalid_client"})),
+        )
+            .into_response());
+    };
+
+    let Some(client) = state.upstream.store.get_client(client_id).await else {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "invalid_client"})),
+        )
+            .into_response());
+    };
+
+    match client.token_endpoint_auth_method.as_str() {
+        "none" => {}
+        "client_secret_basic" => {
+            let Some(auth_header) = headers.get(axum::http::header::AUTHORIZATION) else {
+                return Err(client_auth_error());
+            };
+            let Ok(auth_value) = auth_header.to_str() else {
+                return Err(client_auth_error());
+            };
+            let Some(encoded) = auth_value.strip_prefix("Basic ") else {
+                return Err(client_auth_error());
+            };
+            let Ok(decoded) = general_purpose::STANDARD.decode(encoded) else {
+                return Err(client_auth_error());
+            };
+            let Ok(credentials) = String::from_utf8(decoded) else {
+                return Err(client_auth_error());
+            };
+            let Some((basic_client_id, basic_secret)) = credentials.split_once(':') else {
+                return Err(client_auth_error());
+            };
+            if basic_client_id != client_id {
+                return Err(client_auth_error());
+            }
+            let Some(expected_secret) = &client.client_secret else {
+                return Err(client_auth_error());
+            };
+            if basic_secret != expected_secret.as_str() {
+                return Err(client_auth_error());
+            }
+        }
+        "client_secret_post" => {
+            let Some(secret) = &form._client_secret else {
+                return Err(client_auth_error());
+            };
+            let Some(expected_secret) = &client.client_secret else {
+                return Err(client_auth_error());
+            };
+            if secret != expected_secret.as_str() {
+                return Err(client_auth_error());
+            }
+        }
+        _ => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "invalid_client"})),
+            )
+                .into_response());
+        }
+    }
+
+    Ok(())
+}
+
+fn client_auth_error() -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(serde_json::json!({"error": "invalid_client"})),
+    )
+        .into_response()
 }
 
 async fn handle_authorization_code(

@@ -15,7 +15,7 @@
     <artifactId>springboot-v4-resource-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>springboot-v4-resource-server</name>
-    <description>Example Spring Boot 4 resource server for oauth2-mock-server</description>
+    <description>Example Spring Boot 4 resource server for o2ms</description>
 
     <properties>
         <java.version>21</java.version>

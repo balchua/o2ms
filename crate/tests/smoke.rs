@@ -1,5 +1,5 @@
-use oauth2_mock_server::{
-    AppConfig, ClientConfig, GatewayConfig, GatewayMode, GatewayRouteConfig, HeaderValueFormat,
+use o2ms::{
+    AppConfig, ClientConfig, GatewayConfig, GatewayRouteConfig, HeaderValueFormat,
     ServerConfig, TokenField, TokenHeaderConfig, TokenResponseConfig, spawn,
 };
 use serde_json::Value;
@@ -292,12 +292,12 @@ async fn admin_reset_clears_runtime_state_and_reseeds_configured_clients()
 async fn preloaded_client_can_use_token_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
-    config.clients = vec![oauth2_mock_server::ClientConfig {
+    config.clients = vec![o2ms::ClientConfig {
         client_id: "seeded-client".to_string(),
         client_name: "Seeded Client".to_string(),
         allowed_scopes: vec!["openid".to_string(), "profile".to_string()],
         default_scopes: vec!["openid".to_string()],
-        ..oauth2_mock_server::ClientConfig::default()
+        ..o2ms::ClientConfig::default()
     }];
 
     let server = spawn(config).await?;
@@ -329,7 +329,7 @@ async fn configured_claims_are_embedded_in_issued_access_tokens()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
-    config.clients = vec![oauth2_mock_server::ClientConfig {
+    config.clients = vec![o2ms::ClientConfig {
         client_id: "claims-client".to_string(),
         client_name: "Claims Client".to_string(),
         allowed_scopes: vec!["openid".to_string()],
@@ -339,7 +339,7 @@ async fn configured_claims_are_embedded_in_issued_access_tokens()
             "tenant".to_string(),
             serde_json::json!("sandbox"),
         )]),
-        ..oauth2_mock_server::ClientConfig::default()
+        ..o2ms::ClientConfig::default()
     }];
     config.claims_templates = std::collections::BTreeMap::from([(
         "shared".to_string(),
@@ -380,7 +380,7 @@ async fn configured_user_becomes_default_authorization_flow_subject()
     let mut config = AppConfig::default();
     config.server.bind_port = 0;
     config.oauth.require_state = false;
-    config.clients = vec![oauth2_mock_server::ClientConfig {
+    config.clients = vec![o2ms::ClientConfig {
         client_id: "auth-client".to_string(),
         client_name: "Auth Client".to_string(),
         redirect_uris: vec!["http://localhost:8080/callback".to_string()],
@@ -389,15 +389,15 @@ async fn configured_user_becomes_default_authorization_flow_subject()
         allowed_scopes: vec!["openid".to_string()],
         default_scopes: vec!["openid".to_string()],
         linked_users: vec!["demo-user".to_string()],
-        ..oauth2_mock_server::ClientConfig::default()
+        ..o2ms::ClientConfig::default()
     }];
-    config.users = vec![oauth2_mock_server::UserConfig {
+    config.users = vec![o2ms::UserConfig {
         user_id: "demo-user".to_string(),
         sub: "demo-subject".to_string(),
         username: "demo".to_string(),
         email: "demo@example.com".to_string(),
         display_name: "Demo User".to_string(),
-        ..oauth2_mock_server::UserConfig::default()
+        ..o2ms::UserConfig::default()
     }];
 
     let server = spawn(config).await?;
@@ -468,7 +468,7 @@ async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code
     config.server.bind_port = 0;
     config.oauth.require_state = false;
     config.oauth.authorization_user_picker_enabled = true;
-    config.clients = vec![oauth2_mock_server::ClientConfig {
+    config.clients = vec![o2ms::ClientConfig {
         client_id: "picker-client".to_string(),
         client_name: "Picker Client".to_string(),
         redirect_uris: vec!["http://localhost:8080/callback".to_string()],
@@ -477,24 +477,24 @@ async fn authorization_picker_lists_eligible_users_and_issues_selected_user_code
         allowed_scopes: vec!["openid".to_string()],
         default_scopes: vec!["openid".to_string()],
         linked_users: vec!["demo-user".to_string()],
-        ..oauth2_mock_server::ClientConfig::default()
+        ..o2ms::ClientConfig::default()
     }];
     config.users = vec![
-        oauth2_mock_server::UserConfig {
+        o2ms::UserConfig {
             user_id: "demo-user".to_string(),
             sub: "demo-subject".to_string(),
             username: "demo".to_string(),
             email: "demo@example.com".to_string(),
             display_name: "Demo User".to_string(),
-            ..oauth2_mock_server::UserConfig::default()
+            ..o2ms::UserConfig::default()
         },
-        oauth2_mock_server::UserConfig {
+        o2ms::UserConfig {
             user_id: "support-user".to_string(),
             sub: "support-subject".to_string(),
             username: "support".to_string(),
             email: "support@example.com".to_string(),
             display_name: "Support User".to_string(),
-            ..oauth2_mock_server::UserConfig::default()
+            ..o2ms::UserConfig::default()
         },
     ];
 
@@ -584,7 +584,6 @@ async fn gateway_forwards_request_with_valid_local_token() -> Result<(), Box<dyn
     config.server.bind_port = 0;
     config.gateway = GatewayConfig {
         enabled: true,
-        mode: GatewayMode::OauthAndGateway,
         timeout_ms: 2000,
         routes: vec![GatewayRouteConfig {
             id: "users".to_string(),
@@ -635,7 +634,6 @@ async fn gateway_rejects_invalid_or_missing_token_without_upstream_call()
     config.server.bind_port = 0;
     config.gateway = GatewayConfig {
         enabled: true,
-        mode: GatewayMode::OauthAndGateway,
         routes: vec![GatewayRouteConfig {
             id: "users".to_string(),
             path_prefix: "/proxy/users".to_string(),
@@ -681,7 +679,6 @@ async fn gateway_maps_upstream_timeout_to_504() -> Result<(), Box<dyn std::error
     config.server.bind_port = 0;
     config.gateway = GatewayConfig {
         enabled: true,
-        mode: GatewayMode::OauthAndGateway,
         timeout_ms: 100,
         routes: vec![GatewayRouteConfig {
             id: "slow".to_string(),

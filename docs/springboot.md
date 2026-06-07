@@ -23,13 +23,13 @@ The example supports both:
 Use the Spring-oriented mock config:
 
 ```bash
-cargo run -p oauth2-mock-server -- --config configs/mock-server.springboot.yaml
+cargo run -p o2ms -- --config configs/mock-server.springboot.yaml
 ```
 
 You can also override the bind port or issuer URL from the CLI:
 
 ```bash
-cargo run -p oauth2-mock-server -- \
+cargo run -p o2ms -- \
   --config configs/mock-server.springboot.yaml \
   --bind-port 9191 \
   --issuer-base-url http://127.0.0.1:9191
@@ -142,3 +142,74 @@ Authorization: Bearer <jwt>
 ```
 
 For the browser login flow, Spring Boot exchanges the authorization code server-side, so you do not manually call `/token` yourself.
+
+## Gateway client example
+
+A separate Java client example is available under:
+
+```text
+examples/gateway-client/
+```
+
+This is a minimal Spring Boot command-line application that:
+
+1. obtains a bearer token from the mock server's `/token` endpoint
+2. calls a gateway route with the token
+3. demonstrates the `401` response when no token is sent
+
+### Prerequisites
+
+1. Start the mock server with gateway enabled:
+   ```bash
+O2MS_GATEWAY__ENABLED=true \
+  cargo run -p o2ms
+   ```
+
+2. Start the Spring Boot resource server (the upstream):
+   ```bash
+   MOCK_ISSUER_URI=http://127.0.0.1:8090 \
+     mvn -f examples/springboot-v4-resource-server/pom.xml spring-boot:run
+   ```
+
+The gateway client will call the Spring Boot API through the mock server's gateway proxy at `/proxy/springboot/api/me`.
+
+### Run the gateway client
+
+```bash
+cd examples/gateway-client
+mvn spring-boot:run
+```
+
+Or from the repository root:
+
+```bash
+mvn -f examples/gateway-client/pom.xml spring-boot:run
+```
+
+### Configuration
+
+The client reads these environment variables (with defaults):
+
+| Variable | Default | Description |
+|---|---|---|---|
+| `MOCK_SERVER_BASE_URL` | `http://127.0.0.1:8090` | Mock server base URL |
+| `MOCK_SERVER_GATEWAY_ROUTE` | `http://127.0.0.1:8090/proxy/springboot/api/me` | Full gateway route URL |
+| `MOCK_SERVER_CLIENT_ID` | `springboot-resource-server` | OAuth client ID for token request |
+| `MOCK_SERVER_CLIENT_SECRET` | `abc1234` | Client secret for `client_secret_basic` auth |
+| `MOCK_SERVER_SCOPE` | `openid` | Scope for token request |
+
+### Expected output
+
+```
+Obtaining token from http://127.0.0.1:8090/token ...
+Token obtained successfully
+Calling gateway at http://127.0.0.1:8090/proxy/springboot/api/me ...
+Gateway response status: 200
+Gateway response body: {"subject":"...","issuer":"http://127.0.0.1:8090","scope":"openid","roles":["USER"],"authorizations":[]}
+Calling gateway without token (expect 401) ...
+Gateway response without token: 401 {"error":"missing_bearer_token"}
+```
+
+### Gateway config reference
+
+See [docs/gateway.md](gateway.md) for the full gateway configuration guide.

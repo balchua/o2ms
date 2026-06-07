@@ -37,13 +37,13 @@ The code is organized into:
 From the repository root:
 
 ```bash
-cargo run -p oauth2-mock-server
+cargo run -p o2ms
 ```
 
 To increase logging detail during troubleshooting:
 
 ```bash
-RUST_LOG=oauth2_mock_server=debug cargo run -p oauth2-mock-server
+RUST_LOG=o2ms=debug cargo run -p o2ms
 ```
 
 Default local endpoints:

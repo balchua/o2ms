@@ -30,7 +30,6 @@ O2MS_ISSUER__BASE_URL=http://127.0.0.1:9191
 O2MS_OAUTH__REQUIRE_STATE=false
 O2MS_OAUTH__ACCESS_TOKEN_TTL_SECONDS=120
 O2MS_GATEWAY__ENABLED=true
-O2MS_GATEWAY__MODE=oauth_and_gateway
 O2MS_GATEWAY__TIMEOUT_MS=1500
 ```
 
@@ -44,7 +43,7 @@ Rules:
 ## Start the server with a config file
 
 ```bash
-O2MS_CONFIG=configs/mock-server.yaml cargo run -p oauth2-mock-server
+O2MS_CONFIG=configs/mock-server.yaml cargo run -p o2ms
 ```
 
 Or run fully from environment variables:
@@ -52,7 +51,7 @@ Or run fully from environment variables:
 ```bash
 O2MS_SERVER__BIND_PORT=9191 \
 O2MS_ISSUER__BASE_URL=http://127.0.0.1:9191 \
-cargo run -p oauth2-mock-server
+cargo run -p o2ms
 ```
 
 ## CLI flags
@@ -60,7 +59,7 @@ cargo run -p oauth2-mock-server
 Common runtime overrides can also be supplied from the command line:
 
 ```bash
-cargo run -p oauth2-mock-server -- \
+cargo run -p o2ms -- \
   --config configs/mock-server.yaml \
   --bind-port 9191 \
   --issuer-base-url http://127.0.0.1:9191 \
@@ -180,9 +179,7 @@ oauth:
     - email
   token_endpoint_auth_methods:
     - client_secret_basic
-    - client_secret_post
     - none
-    - private_key_jwt
   code_challenge_methods:
     - plain
     - S256
@@ -203,7 +200,7 @@ Fields:
 - `supported_response_types`: allowed response types
 - `supported_scopes`: globally supported scopes
 - `supported_claims`: claims advertised by discovery
-- `token_endpoint_auth_methods`: advertised token endpoint auth methods
+- `token_endpoint_auth_methods`: supported client auth methods (`none` or `client_secret_basic`)
 - `code_challenge_methods`: advertised PKCE challenge methods
 - `signing_algorithm`: currently must be `RS256`
 - `signing_key_strategy`: currently must be `ephemeral_rsa`
@@ -213,7 +210,8 @@ Validation:
 - TTL values must be greater than zero
 - `signing_algorithm` currently only supports `RS256`
 - `signing_key_strategy` currently only supports `ephemeral_rsa`
-- `token_endpoint_auth_methods` and `code_challenge_methods` must use supported values
+- `token_endpoint_auth_methods` and `code_challenge_methods` must use supported values.
+  Supported auth methods: `none`, `client_secret_basic`.
 
 ### `gateway`
 
@@ -222,7 +220,6 @@ Controls optional path-prefix API gateway behavior.
 ```yaml
 gateway:
   enabled: false
-  mode: oauth_only
   timeout_ms: 2000
   max_body_bytes: 1048576
   auth:
@@ -232,15 +229,9 @@ gateway:
   routes: []
 ```
 
-Supported modes:
-
-- `oauth_only` (default): OAuth endpoints only, no proxy routes
-- `oauth_and_gateway`: OAuth endpoints plus proxy routes
-
 Fields:
 
 - `enabled`: enables gateway route proxying
-- `mode`: `oauth_only` or `oauth_and_gateway`
 - `timeout_ms`: upstream timeout in milliseconds
 - `max_body_bytes`: global request/response body cap for gateway traffic
 - `auth.validate_with_local_oauth`: must be `true` in v1
@@ -257,7 +248,6 @@ Fields:
 
 Validation:
 
-- `gateway.enabled=true` requires `gateway.mode=oauth_and_gateway`
 - `timeout_ms` and `max_body_bytes` must be greater than zero
 - route ids must be unique
 - route prefixes must start with `/` and cannot be `/`
@@ -362,6 +352,11 @@ Startup behavior:
 - `/register` is optional and only needed for dynamic/manual registration scenarios
 - for most local integration testing, preloading clients in YAML is the preferred path
 - `token_response_override`, when present, replaces the global `token_response` behavior for that client only
+
+Client authentication at the token endpoint:
+
+- `none` — no secret required (default). The client is identified by `client_id` alone.
+- `client_secret_basic` — requires `Authorization: Basic <base64(client_id:client_secret)>` header. Set `client_secret` and `token_endpoint_auth_method: client_secret_basic` on the client.
 
 ### `users`
 

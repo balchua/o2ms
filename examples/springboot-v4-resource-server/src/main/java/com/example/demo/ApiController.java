@@ -15,6 +15,8 @@ public class ApiController {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("subject", jwt.getSubject());
         response.put("issuer", jwt.getIssuer() != null ? jwt.getIssuer().toString() : null);
+        response.put("name", jwt.getClaimAsString("name"));
+        response.put("email", jwt.getClaimAsString("email"));
         response.put("scope", jwt.getClaimAsString("scope"));
         response.put("roles", jwt.getClaimAsStringList("roles"));
         response.put("authorizations", jwt.getClaim("authorizations"));

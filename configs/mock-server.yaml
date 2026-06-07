@@ -35,9 +35,7 @@ oauth:
     - email
   token_endpoint_auth_methods:
     - client_secret_basic
-    - client_secret_post
     - none
-    - private_key_jwt
   code_challenge_methods:
     - plain
     - S256
@@ -45,24 +43,19 @@ oauth:
   signing_key_strategy: ephemeral_rsa
 
 gateway:
-  enabled: false
-  mode: oauth_only
+  enabled: true
   timeout_ms: 2000
   max_body_bytes: 1048576
   auth:
     validate_with_local_oauth: true
     outbound_header_name: Authorization
     outbound_value_format: bearer
-  routes: []
-  # Example route:
-  # routes:
-  #   - id: users-api
-  #     enabled: true
-  #     path_prefix: /proxy/users
-  #     upstream_base_url: http://127.0.0.1:9001
-  #     auth_required: true
-  #     outbound_header_name: X-Forwarded-Access-Token
-  #     outbound_value_format: raw
+  routes:
+    - id: springboot-api
+      enabled: true
+      path_prefix: /proxy/springboot
+      upstream_base_url: http://127.0.0.1:8081
+      auth_required: true
 
 token_response:
   emit_json_body: true
@@ -77,8 +70,8 @@ clients:
   - client_id: springboot-resource-server
     client_name: Spring Boot Resource Server
     enabled: true
-    client_secret: null
-    token_endpoint_auth_method: none
+    client_secret: "abc1234"
+    token_endpoint_auth_method: client_secret_basic
     redirect_uris: []
     grant_types:
       - client_credentials
@@ -89,7 +82,7 @@ clients:
       - profile
       - email
     default_scopes:
-      - openid
+      - email
     linked_users:
       - demo-user
     claims_template_refs:
@@ -115,7 +108,10 @@ users:
 claims_templates:
   spring-default:
     name: Demo User
-    authorizations: []
+    email: demo@example.com
+    roles:
+      - USER
+    authorizations: ["read:messages", "write:messages"]
 
 admin:
   reset_endpoint_enabled: false

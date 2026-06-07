@@ -10,7 +10,7 @@ pub mod upstream;
 
 pub use app::startup::{RunningServer, run, run_from_sources, spawn};
 pub use config::model::{
-    AdminConfig, AppConfig, ClientConfig, GatewayAuthConfig, GatewayConfig, GatewayMode,
+    AdminConfig, AppConfig, ClientConfig, GatewayAuthConfig, GatewayConfig,
     GatewayRouteConfig, HeaderValueFormat, IssuerConfig, OauthConfig, ServerConfig, TokenField,
     TokenHeaderConfig, TokenResponseConfig, UserConfig,
 };

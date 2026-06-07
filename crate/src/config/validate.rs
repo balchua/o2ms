@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::{
     claims::protect::PROTECTED_CLAIMS,
-    config::model::{AppConfig, ClientConfig, GatewayMode, UserConfig},
+    config::model::{AppConfig, ClientConfig, UserConfig},
     error::AppError,
 };
 
@@ -53,12 +53,6 @@ pub fn validate(config: &AppConfig) -> Result<(), AppError> {
 }
 
 fn validate_gateway(config: &AppConfig) -> Result<(), AppError> {
-    if config.gateway.enabled && config.gateway.mode != GatewayMode::OauthAndGateway {
-        return Err(AppError::InvalidConfig(
-            "gateway.enabled=true requires gateway.mode=oauth_and_gateway".to_string(),
-        ));
-    }
-
     if config.gateway.timeout_ms == 0 {
         return Err(AppError::InvalidConfig(
             "gateway.timeout_ms must be greater than zero".to_string(),
@@ -600,25 +594,11 @@ clients:
     }
 
     #[test]
-    fn rejects_gateway_enabled_with_oauth_only_mode() {
-        let result = load_from_yaml(
-            r"
-gateway:
-  enabled: true
-  mode: oauth_only
-",
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn rejects_gateway_reserved_prefix() {
         let result = load_from_yaml(
             r"
 gateway:
   enabled: true
-  mode: oauth_and_gateway
   routes:
     - id: bad
       path_prefix: /token
@@ -635,7 +615,6 @@ gateway:
             r"
 gateway:
   enabled: true
-  mode: oauth_and_gateway
   routes:
     - id: users
       path_prefix: /proxy/users
@@ -655,7 +634,6 @@ gateway:
             r#"
 gateway:
   enabled: true
-  mode: oauth_and_gateway
   auth:
     outbound_header_name: "bad header"
 "#,

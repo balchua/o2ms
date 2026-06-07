@@ -1,0 +1,10 @@
+mock:
+  server:
+    base-url: ${MOCK_SERVER_BASE_URL:http://127.0.0.1:8090}
+    gateway-route: ${MOCK_SERVER_GATEWAY_ROUTE:http://127.0.0.1:8090/proxy/springboot/api/me}
+    client-id: ${MOCK_SERVER_CLIENT_ID:springboot-resource-server}
+    client-secret: ${MOCK_SERVER_CLIENT_SECRET:abc1234}
+    scope: ${MOCK_SERVER_SCOPE:email}
+
+server:
+  port: 0

@@ -127,8 +127,8 @@ impl CliOptions {
 
     #[must_use]
     pub fn help_text() -> &'static str {
-        "oauth2-mock-server\n\n\
-Usage:\n  cargo run -p oauth2-mock-server -- [options]\n\n\
+        "o2ms\n\n\
+Usage:\n  cargo run -p o2ms -- [options]\n\n\
 Options:\n  --config <path>                               Path to a YAML config file\n  --bind-host <host>                            Override server.bind_host\n  --bind-port <port>                            Override server.bind_port\n  --issuer-base-url <url>                       Override issuer.base_url\n  --log-level <level>                           Override server.log_level\n  --health-endpoint-enabled <true|false>        Override server.health_endpoint_enabled\n  --runtime-client-registration-enabled <bool>  Override server.runtime_client_registration_enabled\n  -h, --help                                    Show this help text\n"
     }
 }
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn parses_supported_flags() -> Result<(), Box<dyn std::error::Error>> {
         let options = CliOptions::parse_from([
-            "oauth2-mock-server".to_string(),
+            "o2ms".to_string(),
             "--config=configs/mock-server.yaml".to_string(),
             "--bind-host".to_string(),
             "0.0.0.0".to_string(),
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn rejects_unknown_flags() {
         let result = CliOptions::parse_from([
-            "oauth2-mock-server".to_string(),
+            "o2ms".to_string(),
             "--wat".to_string(),
         ]);
 

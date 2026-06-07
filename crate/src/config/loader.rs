@@ -167,7 +167,7 @@ issuer:
 
     #[test]
     fn loads_config_from_file_path() -> Result<(), Box<dyn std::error::Error>> {
-        let path = temp_file_path("oauth2-mock-server-config");
+        let path = temp_file_path("o2ms-config");
         fs::write(
             &path,
             r"
@@ -213,7 +213,7 @@ issuer:
 
     #[test]
     fn cli_overrides_apply_after_file_loading() -> Result<(), Box<dyn std::error::Error>> {
-        let path = temp_file_path("oauth2-mock-server-cli-overrides");
+        let path = temp_file_path("o2ms-cli-overrides");
         fs::write(
             &path,
             r"
@@ -241,7 +241,6 @@ issuer:
     fn layered_overrides_apply_to_gateway_settings() -> Result<(), Box<dyn std::error::Error>> {
         let builder = RawConfig::builder()
             .set_override("gateway.enabled", true)?
-            .set_override("gateway.mode", "oauth_and_gateway")?
             .set_override("gateway.timeout_ms", 1500_u64)?
             .set_override("gateway.routes[0].id", "users")?
             .set_override("gateway.routes[0].path_prefix", "/proxy/users")?

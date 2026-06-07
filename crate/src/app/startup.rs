@@ -108,7 +108,6 @@ pub async fn run(config: AppConfig) -> Result<(), AppError> {
     let require_state = config.oauth.require_state;
     let signing_algorithm = config.oauth.signing_algorithm.clone();
     let gateway_enabled = config.gateway.enabled;
-    let gateway_mode = config.gateway.mode.clone();
     let gateway_routes = config
         .gateway
         .routes
@@ -153,7 +152,6 @@ pub async fn run(config: AppConfig) -> Result<(), AppError> {
     tracing::info!(token = %format!("{base_url}/token"), "token endpoint");
     if gateway_enabled {
         tracing::info!(
-            gateway_mode = ?gateway_mode,
             gateway_routes,
             "gateway routing enabled"
         );

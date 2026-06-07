@@ -67,7 +67,7 @@ Status:
 
 ## Gateway proxy routes
 
-When `gateway.enabled=true` and `gateway.mode=oauth_and_gateway`, configured `gateway.routes[].path_prefix` values are mounted as proxy routes.
+When `gateway.enabled=true`, configured `gateway.routes[].path_prefix` values are mounted as proxy routes.
 
 Behavior:
 

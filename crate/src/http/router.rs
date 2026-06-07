@@ -1,6 +1,6 @@
 use crate::{
     app::state::WrapperState,
-    config::model::{AppConfig, GatewayMode},
+    config::model::AppConfig,
     gateway,
 };
 use axum::{
@@ -52,7 +52,7 @@ pub fn build_router(config: &AppConfig, state: WrapperState) -> Router {
             .route("/register/{client_id}", get(oauth::get_client_proxy));
     }
 
-    if config.gateway.enabled && config.gateway.mode == GatewayMode::OauthAndGateway {
+    if config.gateway.enabled {
         router = router
             .route("/", any(gateway::proxy_request))
             .route("/{*path}", any(gateway::proxy_request))
