@@ -51,8 +51,8 @@ clients:
   - client_id: springboot-resource-server
     client_name: Spring Boot Resource Server
     enabled: true
-    client_secret: null
-    token_endpoint_auth_method: none
+    client_secret: springboot-secret
+    token_endpoint_auth_method: client_secret_basic
     redirect_uris: []
     grant_types:
       - client_credentials
@@ -91,6 +91,7 @@ clients:
       - email
     linked_users:
       - demo-user
+      - support-user
     claims_template_refs:
       - spring-default
     custom_claims: {}
